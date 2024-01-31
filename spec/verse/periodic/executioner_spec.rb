@@ -14,9 +14,9 @@ RSpec.describe Verse::Periodic::Executioner do
       x = 1
 
       100.times do
-        @executioner.call do
+        @executioner.call(lambda do
           x += 1
-        end
+        end)
       end
 
       sleep 0.01 until @executioner.empty?
@@ -28,9 +28,9 @@ RSpec.describe Verse::Periodic::Executioner do
       expect(Verse.logger).to receive(:warn).with("Error in periodic task:")
       expect(Verse.logger).to receive(:warn).with(StandardError)
 
-      @executioner.call do
+      @executioner.call(lambda do
         raise StandardError
-      end
+      end)
 
       sleep 0.01 until @executioner.empty?
     end
