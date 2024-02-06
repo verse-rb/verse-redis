@@ -78,7 +78,7 @@ module Verse
       end
 
       def validate_config
-        result = Verse::Redis::Config::Schema.validate(config)
+        result = Verse::Redis::Config::Schema.validate(@config)
 
         return result.value if result.success?
 

@@ -8,7 +8,7 @@ module Verse
 
     class Config
       Schema = Verse::Schema.define do
-        field(:max_connections, Integer).default(1)
+        field(:max_connections, Integer).default(1).rule("must be positive integer") { |value| value > 0 }
         field(:url, String).filled
 
         transform { |schema| Config.new(**schema) }
