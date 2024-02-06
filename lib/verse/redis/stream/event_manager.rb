@@ -116,6 +116,7 @@ module Verse
         # @param block [Proc] The block to execute when a message is received
         # @return [Verse::Event::Subscription] The subscription object
         def subscribe(channel, mode = Verse::Event::Manager::MODE_CONSUMER, &block)
+          @subscriber.add(channel, mode, &block)
           case mode
           when Verse::Event::Manager::MODE_BROADCAST
             subscribe_broadcast channel, &block

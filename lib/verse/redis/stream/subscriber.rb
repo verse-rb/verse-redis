@@ -15,62 +15,18 @@ module Verse
           Schema = Verse::Schema.define do
             field(:max_block_time, Float).default(2.0)
             field(:min_block_time, Float).default(0.1)
-            field(:block_time_delta, Float).default(0.7).validate("must be between 0 and 1") { |x| x > 0 && x <= 1 }
-            field(:max_messages_count, Integer).default(10).validate("must be positive integer") { |x| x > 0 }
+            field(:block_time_delta, Float).default(0.7).rule("must be between 0 and 1") { |x| x > 0 && x <= 1 }
+            field(:max_messages_count, Integer).default(10).rule("must be positive integer") { |x| x > 0 }
 
-            transform{ Config.new(**data) }
+            transform{ |data| Config.new(data) }
           end
         end
 
-        LOCK_SHARDS_SCRIPT = <<-LUA
-          local stream_names = ARGV[1]
-          local group_name = ARGV[2]
-          local service_id = ARGV[3]
-          local shard_count = tonumber(ARGV[4])
+        # atomic lock of shards
+        LOCK_SHARDS_SCRIPT = File.read(File.join(__dir__, "lock_shards.lua").freeze)
 
-          local flag = 0
-
-          local out = {}
-
-          for _, stream_name in ipairs(stream_names) do
-            for i = 0, shard_count - 1 do
-              local key = 'VERSE:STREAM:SHARDLOCK:' + stream_name + ":" + i + ':' + group_name
-              local is_set = redis.set(key, service_id, 'NX', 'EX', 600)
-
-              if is_set then
-                flag = flag | (1 << i)
-              end
-            end
-
-            out[stream_name] = flag
-          end
-
-          return out
-        LUA
-
-        # atomic unlock of specific shards
-        UNLOCK_SHARDS_SCRIPT = <<-LUA
-          local stream_names = ARGV[1]
-          local group_name = ARGV[2]
-          local service_id = ARGV[3]
-          local shard_count = tonumber(ARGV[4])
-
-          for stream_name, flags in ipairs(stream_names) do
-            for i = 0, shard_count - 1 do
-              if flags & (1 << i) != 0 then
-                local key = 'VERSE:STREAM:SHARDLOCK:' + stream_name + ":" + i + ':' + group_name
-                local value = redis.get(key)
-
-                if value == service_id then
-                  redis.call('DEL', key)
-                end
-              end
-            end
-          end
-
-          return '1'
-        LUA
-
+        # atomic unlock of shards
+        UNLOCK_SHARDS_SCRIPT = File.read(File.join(__dir__, "unlock_shards.lua").freeze)
 
         # @param config [Hash] The configuration for the subscriber
         # @param consumer_name [String] The name of the consumer
@@ -89,12 +45,20 @@ module Verse
           @consumer_name = consumer_name
           @consumer_id = consumer_id
 
-          @block_time = config.min_block_time
+          @block_time = @config.min_block_time
 
           @cond = new_cond
 
           t = Thread.new{ run }
           t.name = "Verse Redis EM - Subscriber"
+        end
+
+        def validate_config(config)
+          result = Config::Schema.validate(config)
+
+          return result.value if result.success?
+
+          raise "Invalid config for redis plugin: #{result.errors}"
         end
 
         def run_script(script, redis, keys: [], argv: [])
@@ -107,19 +71,19 @@ module Verse
 
         def acquire_locks(channels, redis)
           run_script(
-            LOCK_SCRIPT,
+            LOCK_SHARDS_SCRIPT,
             redis,
             keys: [],
-            argv: [channels, Verse.service_name, Verse.service_id, @shards]
+            argv: [@consumer_name, @consumer_id, @shards, *channels]
           )
         end
 
         def release_locks(channels, redis)
           run_script(
-            UNLOCK_SCRIPT,
+            UNLOCK_SHARDS_SCRIPT,
             redis,
             keys: [],
-            argv: [channels, Verse.service_name, Verse.service_id, @shards]
+            argv: [@consumer_name, @consumer_id, @shards, *channels]
           )
         end
 
@@ -167,6 +131,9 @@ module Verse
 
         def read_channels(redis, channels)
           if channels.empty?
+            # do not increase the block time if we have nothing to do
+            # here since the probable cause is that another service
+            # has already locked onto the streams.
             sleep @block_time
             return []
           end
