@@ -28,24 +28,29 @@ module Verse
         # atomic unlock of shards
         UNLOCK_SHARDS_SCRIPT = File.read(File.join(__dir__, "unlock_shards.lua").freeze)
 
+        # Initialize a new subscriber in charge of
+        # reading messages from multiple redis streams.
+        #
         # @param config [Hash] The configuration for the subscriber
         # @param consumer_name [String] The name of the consumer
         # @param consumer_id [String] The id of the consumer
         # @param redis_block [Proc] The block to execute to get a redis connection
         # @param shards [Integer] The number of shards to use
-        def initialize(config, consumer_name, consumer_id, redis_block, shards = 16)
+        # @param block [Proc] The block to execute when a message is received
+        def initialize(config, consumer_name:, consumer_id:, redis:, shards: 16, &block)
           @sha_scripts = {}
 
           @subscription_list = []
           @shards = shards
-          @redis_block = redis_block
+          @redis_block = redis.is_a?(Proc) ? redis : -> (&block) { block.call(redis) }
 
           @config = validate_config(config)
+          @block_time = @config.min_block_time
 
           @consumer_name = consumer_name
           @consumer_id = consumer_id
 
-          @block_time = @config.min_block_time
+          @block = block
 
           @cond = new_cond
 
@@ -61,12 +66,22 @@ module Verse
           raise "Invalid config for redis plugin: #{result.errors}"
         end
 
-        def run_script(script, redis, keys: [], argv: [])
+        def run_script(script, redis, keys: [], argv: [], retried: false)
           script_id = @sha_scripts.fetch(script.object_id) {
-            redis.script(:load, script)
+            @sha_scripts[script.object_id] = redis.script(:load, script)
           }
 
-          redis.evalsha(script_id, keys: keys, argv: argv)
+          begin
+            redis.evalsha(script_id, keys: keys, argv: argv)
+          rescue ::Redis::CommandError => e
+            if !retried && e.message.include?("NOSCRIPT")
+              @sha_scripts.delete(script.object_id)
+              return run_script(script, redis, keys: keys, argv: argv, retried: true)
+            end
+
+            Verse.logger.error(e)
+            raise
+          end
         end
 
         def acquire_locks(channels, redis)
@@ -173,10 +188,10 @@ module Verse
                 @redis_block.call do |redis|
                   begin
                     # Lock as much shards as we can and get the channel list
-                    channels = lock_channel_shards(redis)
+                    sharded_channels = lock_channel_shards(redis)
 
-                    # try to retrieve messages from the locked channels
-                    output = read_channels(redis, channels)
+                    # try to retrieve messages from the locked channels + non locked channels
+                    output = read_channels(redis, [*@subscription_list.keys, *sharded_channels])
 
                     # if we have at least one message
                     if output.any?

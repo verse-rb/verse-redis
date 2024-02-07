@@ -13,14 +13,23 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
     Redis.new
   }
 
-  before { redis.flushall }
+  before {
+    redis.flushall
+    @messages = []
+  }
 
   let(:redis_block) {
     -> (&block) { block.call(redis) }
   }
 
   subject {
-    described_class.new(config, "test_group", "test_id", redis_block)
+    described_class.new(config,
+      consumer_name: "test_group",
+      consumer_id: "test_id",
+      redis: redis,
+    ) do |message|
+      @messages << message
+    end
   }
 
   context "#run_script" do
@@ -57,6 +66,21 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
       # it doesn't unlock the `another_id`
       expect(redis.get("VERSE:STREAM:SHARDLOCK:test_channel:1:test_group")).to eq("another_id")
     end
+
+    it "works even if the script has been flushed (e.g. redis restarted)" do
+      acquired = subject.acquire_locks(["test_channel"], redis)
+
+      redis.script(:flush)
+      redis.flushall #  Doesn't matter, we check that it has no error on evalsha
+
+      acquired = subject.acquire_locks(["test_channel"], redis)
+      expect(acquired).to eq([
+        "test_channel", 0xffff
+      ])
+    end
+  end
+
+  context "#run" do
   end
 
 
