@@ -6,7 +6,7 @@ module Verse
   module Redis
     module Stream
       Config = Struct.new(
-        :streams
+        :streams,
         :plugin_name
       )
 

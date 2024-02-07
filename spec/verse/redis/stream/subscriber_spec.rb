@@ -13,22 +13,31 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
     Redis.new
   }
 
+  let(:redis_listener) {
+    Redis.new
+  }
+
+
   before {
     redis.flushall
-    @messages = []
+    @messages = {}
   }
 
   let(:redis_block) {
-    -> (&block) { block.call(redis) }
+    -> (&block) { block.call(redis_listener) }
   }
+
+  let(:queue) { Queue.new }
 
   subject {
     described_class.new(config,
       consumer_name: "test_group",
       consumer_id: "test_id",
       redis: redis,
-    ) do |message|
-      @messages << message
+    ) do |channel, message|
+      puts "got mail: #{message}"
+      (@messages[channel] ||= []) << message
+      queue << message
     end
   }
 
@@ -81,6 +90,23 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
   end
 
   context "#run" do
+    it "collect messages from the stream" do
+      subject.listen_channel("VERSE:STREAM:test_channel")
+
+      # ensure the consumers are created as they start consuming
+      # events appearing after creation.
+      puts "sleep..."
+      sleep 0.1
+      puts "done"
+
+      # Works with no-sharding
+      puts "add event?..."
+      redis.xadd("VERSE:STREAM:test_channel", {a: 1})
+      puts "DONE?"
+
+      message = queue.pop
+      expect(@messages["VERSE:STREAM:test_channel"]).to eq([{"a" => "1"}])
+    end
   end
 
 

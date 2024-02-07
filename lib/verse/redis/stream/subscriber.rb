@@ -8,7 +8,8 @@ module Verse
           :max_block_time,
           :min_block_time,
           :block_time_delta,
-          :max_messages_count
+          :max_messages_count,
+          keyword_init: true
         )
 
         class Config
@@ -18,7 +19,9 @@ module Verse
             field(:block_time_delta, Float).default(0.7).rule("must be between 0 and 1") { |x| x > 0 && x <= 1 }
             field(:max_messages_count, Integer).default(10).rule("must be positive integer") { |x| x > 0 }
 
-            transform{ |data| Config.new(data) }
+            transform{ |data|
+              Config.new(data)
+            }
           end
         end
 
@@ -93,23 +96,34 @@ module Verse
           )
         end
 
-        def release_locks(channels, redis)
+        def release_locks(channel_and_flags, redis)
           run_script(
             UNLOCK_SHARDS_SCRIPT,
             redis,
             keys: [],
-            argv: [@consumer_name, @consumer_id, @shards, *channels]
+            argv: [@consumer_name, @consumer_id, @shards, *channel_and_flags]
           )
         end
 
         def lock_channel_shards(redis)
-          acquire_locks(@subscription_list.keys, redis)
+          channel_and_flags = acquire_locks(@subscription_list, redis)
+
+          output = []
+          channel_and_flags.each_slice(2).each do |channel, flag|
+            @shards.times do |shard_id|
+              if (flag & (1 << shard_id)) != 0
+                output << "#{channel}:#{shard_id}"
+              end
+            end
+          end
+
+          output
         end
 
         def unlock_channel_shards(redis)
-          chan_flags = @subscription_list.keys.map{ |x|
+          chan_flags = @subscription_list.map{ |x|
             [x, 0xffffffff]
-          }.to_h
+          }.flatten
 
           release_locks(chan_flags, redis)
         end
@@ -144,6 +158,33 @@ module Verse
           ].min
         end
 
+        def read_stream(redis, channels)
+          redis.xreadgroup(
+            @consumer_name,
+            @consumer_id,
+            channels,
+            ['>'] * channels.size,
+            count: @config.max_messages_count,
+            block: @block_time * 1_000, # Time to wait for messages
+            noack: true # simpler, no pending list, can cause loss of messages sometime.
+          )
+        rescue ::Redis::TimeoutError
+          puts "error?"
+          {} # No message
+        rescue ::Redis::CommandError => e
+          if e.message.include?("NOGROUP")
+            # create stream(s), attach group
+            channels.each do |channel|
+              puts "create group #{channel}"
+              redis.xgroup(:create, channel, @consumer_name, 0, mkstream: true)
+            end
+
+            {} # return nothing for this loop...
+          else
+            raise
+          end
+        end
+
         def read_channels(redis, channels)
           if channels.empty?
             # do not increase the block time if we have nothing to do
@@ -153,15 +194,7 @@ module Verse
             return []
           end
 
-          output = redis.xreadgroup(
-            consumer_group,
-            consumer_id,
-            channels,
-            '>',
-            count: @config.max_messages_count,
-            block: @block_time, # Time to wait for messages
-            noack: true # simpler, no pending list, can cause loss of messages sometime.
-          )
+          output = read_stream(redis, channels)
 
           if output.any?
             reduce_block_time
@@ -174,7 +207,7 @@ module Verse
 
         def listen_channel(channel)
           synchronize do
-            @subscription_list << true
+            @subscription_list << channel
             @cond.signal
           end
         end
@@ -182,43 +215,34 @@ module Verse
         def run
           loop do
             synchronize do
-              begin
-                @cond.wait if @subscription_list.empty?
+              @cond.wait if @subscription_list.empty?
 
-                @redis_block.call do |redis|
-                  begin
-                    # Lock as much shards as we can and get the channel list
-                    sharded_channels = lock_channel_shards(redis)
+              # Lock as much shards as we can and get the channel list
+              sharded_channels = @redis_block.call { |redis| lock_channel_shards(redis) }
 
-                    # try to retrieve messages from the locked channels + non locked channels
-                    output = read_channels(redis, [*@subscription_list.keys, *sharded_channels])
+              # try to retrieve messages from the locked channels + non locked channels
+              output = @redis_block.call { |redis| read_channels(redis, [*@subscription_list, *sharded_channels]) }
 
-                    # if we have at least one message
-                    if output.any?
-                      # release shards which gave nothing
-                      # while we are processing the messages.
-                      # keep other shards locked during processing time.
-                      unlock_empty_shards(output.keys)
+              # if we have at least one message
+              if output.any?
+                # release shards which gave nothing
+                # while we are processing the messages.
+                # keep other shards locked during processing time.
+                @redis_block.call { |redis| unlock_empty_shards(output.keys) }
 
-                      # process the messages
-                      process_messages(output)
-                    end
-                  ensure
-                    # ensure to unlock all the shards
-                    unlock_channel_shards(redis)
-                  end
-                end
-
+                # process the messages
                 output.each do |channel, messages|
-                  messages.each do |message|
-                    @manager.trigger(channel, message)
+                  messages.each do |(_, message)|
+                    @block.call(channel, message)
                   end
                 end
-
-              rescue => e
-                # log the error
-                Verse.logger.error{ e }
               end
+            rescue => e
+              # log the error but continue
+              Verse.logger.error{ e }
+            ensure
+              # ensure to unlock all the shards
+              @redis_block.call { |redis| unlock_channel_shards(redis) }
             end
           end
 
