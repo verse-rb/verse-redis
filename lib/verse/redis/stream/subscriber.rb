@@ -128,7 +128,7 @@ module Verse
           release_locks(chan_flags, redis)
         end
 
-        def unlock_empty_shards(message_channels)
+        def unlock_empty_shards(message_channels, redis)
           hash = {}
 
           message_channels.each do |channel|
@@ -141,7 +141,7 @@ module Verse
             hash[original_channel] &= ~(1 << shard_id)
           end
 
-          hash
+          release_locks(hash.to_a.flatten, redis)
         end
 
         def reduce_block_time
@@ -228,7 +228,7 @@ module Verse
                 # release shards which gave nothing
                 # while we are processing the messages.
                 # keep other shards locked during processing time.
-                @redis_block.call { |redis| unlock_empty_shards(output.keys) }
+                @redis_block.call { |redis| unlock_empty_shards(output.keys, redis) }
 
                 # process the messages
                 output.each do |channel, messages|
