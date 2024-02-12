@@ -14,7 +14,7 @@ for s = 1, stream_count do
   local stream_name = ARGV[3 + s]
 
   for i = 0, shard_count - 1 do
-    local key = 'VERSE:STREAM:SHARDLOCK:' .. stream_name .. ":" .. i .. ':' .. group_name
+    local key = '{VERSE:STREAM:SHARDLOCK}:' .. stream_name .. ":" .. i .. ':' .. group_name
     local is_set = redis.call('SET', key, service_id, 'NX', 'EX', 1800)
 
     if is_set then

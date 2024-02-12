@@ -9,7 +9,7 @@ for stream_id = 1, stream_count do
 
   for i = 0, shard_count - 1 do
     if bit.band(flags, bit.lshift(1, i)) ~= 0 then
-      local key = 'VERSE:STREAM:SHARDLOCK:' .. stream_name .. ":" .. i .. ':' .. group_name
+      local key = '{VERSE:STREAM:SHARDLOCK}:' .. stream_name .. ":" .. i .. ':' .. group_name
       local value = redis.call('GET', key)
 
       if value == service_id then

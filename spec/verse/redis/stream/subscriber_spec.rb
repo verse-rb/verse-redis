@@ -23,19 +23,14 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
     @messages = {}
   }
 
-  let(:redis_block) {
-    -> (&block) { block.call(redis_listener) }
-  }
-
   let(:queue) { Queue.new }
 
   subject {
     described_class.new(config,
       consumer_name: "test_group",
       consumer_id: "test_id",
-      redis: redis,
+      redis: redis_listener,
     ) do |channel, message|
-      puts "got mail: #{message}"
       (@messages[channel] ||= []) << message
       queue << message
     end
@@ -58,7 +53,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
       redis.flushall
 
       #create manually a lock
-      redis.set("VERSE:STREAM:SHARDLOCK:test_channel:1:test_group", "another_id")
+      redis.set("{VERSE:STREAM:SHARDLOCK}:test_channel:1:test_group", "another_id")
 
       #try to lock
       acquired = subject.acquire_locks(["test_channel"], redis)
@@ -66,14 +61,14 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
         "test_channel", (0xffff - 2)
       ])
 
-      expect(redis.get("VERSE:STREAM:SHARDLOCK:test_channel:2:test_group")).to eq("test_id")
+      expect(redis.get("{VERSE:STREAM:SHARDLOCK}:test_channel:2:test_group")).to eq("test_id")
 
       # ok now let's unlock all:
       subject.release_locks(["test_channel", 0xffff], redis)
 
-      expect(redis.get("VERSE:STREAM:SHARDLOCK:test_channel:2:test_group")).to eq(nil)
+      expect(redis.get("{VERSE:STREAM:SHARDLOCK}:test_channel:2:test_group")).to eq(nil)
       # it doesn't unlock the `another_id`
-      expect(redis.get("VERSE:STREAM:SHARDLOCK:test_channel:1:test_group")).to eq("another_id")
+      expect(redis.get("{VERSE:STREAM:SHARDLOCK}:test_channel:1:test_group")).to eq("another_id")
     end
 
     it "works even if the script has been flushed (e.g. redis restarted)" do
@@ -95,14 +90,10 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
 
       # ensure the consumers are created as they start consuming
       # events appearing after creation.
-      puts "sleep..."
       sleep 0.1
-      puts "done"
 
       # Works with no-sharding
-      puts "add event?..."
       redis.xadd("VERSE:STREAM:test_channel", {a: 1})
-      puts "DONE?"
 
       message = queue.pop
       expect(@messages["VERSE:STREAM:test_channel"]).to eq([{"a" => "1"}])

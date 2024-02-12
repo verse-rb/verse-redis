@@ -91,7 +91,7 @@ module Verse
           run_script(
             LOCK_SHARDS_SCRIPT,
             redis,
-            keys: [],
+            keys: ["VERSE:STREAM:SHARDLOCK"],
             argv: [@consumer_name, @consumer_id, @shards, *channels]
           )
         end
@@ -100,7 +100,7 @@ module Verse
           run_script(
             UNLOCK_SHARDS_SCRIPT,
             redis,
-            keys: [],
+            keys: ["VERSE:STREAM:SHARDLOCK"],
             argv: [@consumer_name, @consumer_id, @shards, *channel_and_flags]
           )
         end
@@ -175,8 +175,8 @@ module Verse
           if e.message.include?("NOGROUP")
             # create stream(s), attach group
             channels.each do |channel|
-              puts "create group #{channel}"
-              redis.xgroup(:create, channel, @consumer_name, 0, mkstream: true)
+              Verse.logger.debug { "Create consumer group #{@consumer_name} for #{channel}" }
+              redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
             end
 
             {} # return nothing for this loop...
