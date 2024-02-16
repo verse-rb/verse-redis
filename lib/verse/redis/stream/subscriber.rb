@@ -185,6 +185,14 @@ module Verse
           end
         end
 
+        def stop
+          synchronize do
+            @stopped = true
+            @subscription_list.clear
+            @cond.signal
+          end
+        end
+
         def read_channels(redis, channels)
           if channels.empty?
             # do not increase the block time if we have nothing to do
@@ -213,7 +221,7 @@ module Verse
         end
 
         def run
-          loop do
+          while !@stopped
             synchronize do
               @cond.wait if @subscription_list.empty?
 
@@ -238,7 +246,7 @@ module Verse
                 end
               end
             rescue => e
-              # log the error but continue
+              # log the error but continue the loop
               Verse.logger.error{ e }
             ensure
               # ensure to unlock all the shards

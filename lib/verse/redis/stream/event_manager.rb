@@ -1,27 +1,70 @@
+# frozen_string_literal: true
+
 require "securerandom"
 
 module Verse
   module Redis
     module Stream
       class EventManager < Verse::Event::Manager::Base
+        Verse::Event::Manager.add_event_manager_type(:redis, self)
+
         attr_reader :service_name, :config, :logger
 
         def initialize(service_name, config = nil, logger = Logger.new($stdout))
           @service_name = service_name
-          @config = config
+          @config = validate_config(config)
           @logger = logger
         end
 
         def start
-
+          @subscriber = Subscriber.new
         end
 
         def stop
-
+          @subscriber.stop
         end
 
         def with_redis(&block)
           Verse.plugins(@config.plugin_name).with_client(&block)
+        end
+
+        # Publish an event which happened to a specific resource.
+        # This is useful to ensure ordering of events.
+        # @param resource_type [String] The resource type/class
+        # @param resource_id [String] The resource id
+        # @param event [String] The event type
+        # @param payload [Hash] The payload content of the event
+        # @param headers [Hash] The headers of the message (if any)
+        # @param reply_to [String] The channel to send the response to if any
+        def publish_resource_event(resource_type:, resource_id:, event:, payload:, headers: {})
+          shard = find_partition(resource_id)
+
+          stream = ["VERSE:STREAM", resource_type, shard].join(":")
+          simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
+
+          headers = headers.merge(
+            event: event
+          )
+
+          message = Message.new(
+            self,
+            payload,
+            headers: headers
+          )
+
+          content = message.pack
+
+          with_redis do |redis|
+            redis.xadd(
+              stream,
+              content,
+              nomkstream: true,
+              approximate: true,
+              maxlen: max_len
+            )
+            # add to the fire and forget event stream
+            redis.publish(simple_channel, content)
+          end
         end
 
         # Publish an event to a specific channel.
@@ -158,6 +201,14 @@ module Verse
           key.to_s.each_byte.reduce(0) do |a, e|
             (e + a * 498_975_571 + 548_897_941) & 0xffffffff
           end & 15
+        end
+
+        def validate_config(config)
+          result = Config::Schema.validate(config)
+
+          return result.value if result.success?
+
+          raise "Invalid config for redis plugin: #{result.errors}"
         end
 
 

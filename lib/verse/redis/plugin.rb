@@ -77,6 +77,10 @@ module Verse
         @connection_pool << cnx
       end
 
+      def create_connection
+        ::Redis.new(url: @config.url)
+      end
+
       def validate_config
         result = Verse::Redis::Config::Schema.validate(@config)
 

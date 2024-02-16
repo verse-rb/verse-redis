@@ -7,6 +7,8 @@ require_relative "periodic/executioner"
 require_relative "periodic/manager"
 require_relative "periodic/task"
 
+require_relative "redis/stream/event_manager"
+
 module Verse
   # Verse::Redis is a Verse plugin that provides a Redis
   # connection pool and a Redis-backed periodic task manager.

@@ -16,7 +16,7 @@ gem "simplecov"
 
 gem "bootsnap", "~> 1.16"
 
-gem "verse-core", github: "verse-rb/verse-core", branch: "master"
+gem "verse-core", github: "verse-rb/verse-core", branch: "feature/revamp-event-management-system"
 gem "verse-schema", github: "verse-rb/verse-schema", branch: "master"
 
 gem "yard"
