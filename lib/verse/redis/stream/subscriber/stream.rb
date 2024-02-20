@@ -98,7 +98,7 @@ module Verse
               LOCK_SHARDS_SCRIPT,
               redis,
               keys: ["VERSE:STREAM:SHARDLOCK"],
-              argv: [@consumer_name, @consumer_id, @shards, *channels.map(&:first)]
+              argv: [@consumer_name, @consumer_id, @shards, *channels]
             )
           end
 
@@ -112,7 +112,7 @@ module Verse
           end
 
           def lock_channel_shards(redis)
-            channel_and_flags = acquire_locks(channels, redis)
+            channel_and_flags = acquire_locks(channels.map(&:first), redis)
 
             output = []
             channel_and_flags.each_slice(2).each do |channel, flag|
