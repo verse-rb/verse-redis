@@ -25,9 +25,13 @@ module Verse
             @stopped = true
           end
 
-          def listen_channel(channel)
+          def listen_channel(channel, lock = false)
             raise "cannot listen to a channel while the subscriber is running" unless @stopped
-            @channels << channel
+            @channels << [channel, lock]
+          end
+
+          def process_message(channel, message)
+            @block.call(channel, message)
           end
 
           alias :<< :listen_channel

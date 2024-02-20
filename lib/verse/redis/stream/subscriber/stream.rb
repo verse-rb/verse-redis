@@ -57,7 +57,7 @@ module Verse
           def start
             super
             @thread = Thread.new{ run }
-            @thread.name = "Verse Redis EM - Subscriber"
+            @thread.name = "Verse Redis EM - Stream Subscriber"
           end
 
           def stop
@@ -98,7 +98,7 @@ module Verse
               LOCK_SHARDS_SCRIPT,
               redis,
               keys: ["VERSE:STREAM:SHARDLOCK"],
-              argv: [@consumer_name, @consumer_id, @shards, *channels]
+              argv: [@consumer_name, @consumer_id, @shards, *channels.map(&:first)]
             )
           end
 
@@ -127,7 +127,7 @@ module Verse
           end
 
           def unlock_channel_shards(redis)
-            chan_flags = channels.map{ |x|
+            chan_flags = channels.map(&:first).map{ |x|
               [x, 0xffffffff]
             }.flatten
 
@@ -219,7 +219,7 @@ module Verse
                 sharded_channels = redis { |r| lock_channel_shards(r) }
 
                 # try to retrieve messages from the locked channels + non locked channels
-                output = redis { |r| read_channels(r, [*channels, *sharded_channels]) }
+                output = redis { |r| read_channels(r, [*channels.map(&:first), *sharded_channels]) }
 
                 # if we have at least one message
                 if output.any?
@@ -231,7 +231,12 @@ module Verse
                   # process the messages
                   output.each do |channel, messages|
                     messages.each do |(_, message)|
-                      @block.call(channel, message)
+                      begin
+                        process_message(channel, message)
+                      rescue => e
+                        # log the error but continue to process messages
+                        Verse.logger.error{ e }
+                      end
                     end
                   end
                 end

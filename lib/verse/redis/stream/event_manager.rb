@@ -67,6 +67,7 @@ module Verse
               approximate: true,
               maxlen: max_len
             )
+
             # add to the fire and forget event stream
             redis.publish(simple_channel, content)
           end
