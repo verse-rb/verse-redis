@@ -25,7 +25,7 @@ module Verse
             @stopped = true
           end
 
-          def listen_channel(channel, lock = false)
+          def listen_channel(channel, lock: false)
             raise "cannot listen to a channel while the subscriber is running" unless @stopped
             @channels << [channel, lock]
           end

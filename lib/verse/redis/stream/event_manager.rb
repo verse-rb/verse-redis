@@ -3,7 +3,7 @@
 require "securerandom"
 
 require_relative "./subscriber/stream"
-require_relative "./subscriber/basic"
+require_relative "./subscriber/simple"
 
 require_relative "./message"
 require_relative "./config"
