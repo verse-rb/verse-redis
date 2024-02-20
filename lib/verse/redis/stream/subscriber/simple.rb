@@ -59,7 +59,7 @@ module Verse
               end
             end
           rescue ::Redis::BaseConnectionError => error
-            Verse.warn{ "#{error}, retrying in 0.5s" }
+            Verse.warn{ "#{error}, retrying in 500ms" }
             sleep 0.5
             retry
           end

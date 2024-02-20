@@ -54,7 +54,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       subscriber_a.start
       subscriber_b.start
 
-      sleep(0.1) # Wait for subscription
+      sleep(0.1) # Wait for subscription to start
 
       redis.publish("test_channel", "This is a message")
 
@@ -94,6 +94,29 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       subscriber_a.stop
       subscriber_b.stop
     end
+
+
+    it "stress test" do
+      subscriber_a.listen_channel("stress_test", lock: true)
+      subscriber_b.listen_channel("stress_test", lock: true)
+
+      subscriber_a.start
+      subscriber_b.start
+
+      sleep(0.1) # Wait for subscription to start
+
+      100.times do |i|
+        redis.publish("stress_test", "message #{i}")
+      end
+
+      100.times{ queue.pop }
+
+      expect(@messages["stress_test"].size).to eq(100)
+    ensure
+      subscriber_a.stop
+      subscriber_b.stop
+    end
+
   end
 
 
