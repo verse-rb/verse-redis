@@ -25,7 +25,6 @@ module Verse
 
       def on_init
         @config = validate_config
-        @event_manager = EventManager.new(@config)
       end
 
       protected

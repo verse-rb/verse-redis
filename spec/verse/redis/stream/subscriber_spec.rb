@@ -1,7 +1,7 @@
-require "verse/redis/stream/subscriber"
+require "verse/redis/stream/stream_subscriber"
 require "redis"
 
-RSpec.describe Verse::Redis::Stream::Subscriber do
+RSpec.describe Verse::Redis::Stream::StreamSubscriber do
   let(:config) {
     {
       max_block_time: 1,
@@ -9,23 +9,31 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
     }
   }
 
-  let(:redis) {
-    Redis.new
-  }
+  let(:redis) { Redis.new }
+  let(:redis_listener) { Redis.new }
 
-  let(:redis_listener) {
-    Redis.new
-  }
+  around(:each) do |example|
+    protected_methods = described_class.protected_instance_methods
+    private_methods = described_class.private_instance_methods
+
+    begin
+      described_class.send(:public, *protected_methods, *private_methods)
+      example.run
+    ensure
+      described_class.send(:protected, *protected_methods)
+      described_class.send(:private, *private_methods)
+    end
+  end
 
 
-  before {
+  before do
     redis.flushall
     @messages = {}
-  }
+  end
 
   let(:queue) { Queue.new }
 
-  subject {
+  subject do
     described_class.new(config,
       consumer_name: "test_group",
       consumer_id: "test_id",
@@ -34,7 +42,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
       (@messages[channel] ||= []) << message
       queue << message
     end
-  }
+  end
 
   context "#run_script" do
     it "runs LOCK and UNLOCK SCRIPTS" do
@@ -87,6 +95,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber do
   context "#run" do
     it "collect messages from the stream" do
       subject.listen_channel("VERSE:STREAM:test_channel")
+      subject.start
 
       # ensure the consumers are created as they start consuming
       # events appearing after creation.

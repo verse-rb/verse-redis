@@ -2,6 +2,10 @@
 
 require "securerandom"
 
+require_relative "./stream_subscriber"
+require_relative "./message"
+require_relative "./config"
+
 module Verse
   module Redis
     module Stream
@@ -17,15 +21,14 @@ module Verse
         end
 
         def start
-          @subscriber = Subscriber.new
+          prepare_subscriptions
         end
 
         def stop
-          @subscriber.stop
         end
 
         def with_redis(&block)
-          Verse.plugins(@config.plugin_name).with_client(&block)
+          Verse::Plugin[@config.plugin_name].with_client(&block)
         end
 
         # Publish an event which happened to a specific resource.
@@ -71,7 +74,7 @@ module Verse
         def publish(channel, content, headers: {}, key: nil, reply_to: nil)
           message = Message.new(self, content, headers: headers, reply_to: reply_to)
 
-          packed_message = message.to_msgpack
+          packed_message = message.pack
 
           with_redis do |rd|
             # Note for later: to improve bandwidth usage, we should use a LUA script
@@ -83,12 +86,14 @@ module Verse
             # Publish on persistent channel
             partition = key && find_partition(key)
 
-            max_len = @config.streams[channel.to_sym][:maxlen]
+            stream_config = @config.streams[channel.to_sym]
+            max_len = stream_config&.maxlen || @config.maxlen
 
             channel = [channel, partition].compact.join(":")
+
             rd.xadd(
               channel,
-              packed_message,
+              {msg: packed_message},
               approximate: true,
               maxlen: max_len,
               nomkstream: true # Do not create the stream; instead subscribers are creating it on demand.
@@ -160,6 +165,7 @@ module Verse
         # @return [Verse::Event::Subscription] The subscription object
         def subscribe(channel, mode = Verse::Event::Manager::MODE_CONSUMER, &block)
           @subscriber.add(channel, mode, &block)
+
           case mode
           when Verse::Event::Manager::MODE_BROADCAST
             subscribe_broadcast channel, &block

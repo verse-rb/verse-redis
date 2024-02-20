@@ -14,20 +14,24 @@ module Verse
       )
 
       StreamConfig = Struct.new(
-        :partitions, :maxlen
+        :partitions, :maxlen, keyword_init: true
       )
 
       class Config
         Schema = Verse::Schema.define do
-          field(:streams, Hash).default([]) do
+          stream_config = Verse::Schema.define do
             field(:partitions, Integer).default(16)
             field(:maxlen, Integer).default(1_000_000)
-          end.transform { |h| h.transform_values{ |v| StreamConfig.new(**x) } }
+          end
+
+          field(:streams, Hash, of: stream_config)
+            .default({})
+            .transform { |h| h.transform_values{ |v| StreamConfig.new(**v) } }
 
           field(:maxlen, Integer).default(1_000_000)
           field(:partitions, Integer).default(16)
 
-          field(:plugin_name, String).default("redis")
+          field(:plugin_name, Symbol).default(:redis)
 
           transform { |schema| Config.new(**schema) }
         end

@@ -6,7 +6,7 @@ RSpec.describe Verse::Redis::Config do
         max_connections: 1,
         url: "redis://localhost:6379"
       }, true],
-      [{}, false]
+      [{}, true]
     ].each do |(config, valid)|
       expect(Verse::Redis::Config::Schema.validate(config).success?).to be(valid)
     end

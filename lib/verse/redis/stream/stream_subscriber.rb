@@ -1,7 +1,7 @@
 module Verse
   module Redis
     module Stream
-      class Subscriber
+      class StreamSubscriber
         include MonitorMixin
 
         Config = Struct.new(
@@ -54,12 +54,27 @@ module Verse
           @consumer_id = consumer_id
 
           @block = block
-
-          @cond = new_cond
-
-          t = Thread.new{ run }
-          t.name = "Verse Redis EM - Subscriber"
         end
+
+        def start
+          @stopped = false
+          @thread = Thread.new{ run }
+          @thread.name = "Verse Redis EM - Subscriber"
+        end
+
+        def stop
+          @stopped = true
+          @thread&.join
+        end
+
+        def listen_channel(channel)
+          raise "cannot listen to a channel while the subscriber is running" if @thread&.alive?
+          @subscription_list << channel
+        end
+
+        alias :<< :listen_channel
+
+        protected
 
         def validate_config(config)
           result = Config::Schema.validate(config)
@@ -185,14 +200,6 @@ module Verse
           end
         end
 
-        def stop
-          synchronize do
-            @stopped = true
-            @subscription_list.clear
-            @cond.signal
-          end
-        end
-
         def read_channels(redis, channels)
           if channels.empty?
             # do not increase the block time if we have nothing to do
@@ -213,18 +220,11 @@ module Verse
           output
         end
 
-        def listen_channel(channel)
-          synchronize do
-            @subscription_list << channel
-            @cond.signal
-          end
-        end
-
         def run
-          while !@stopped
-            synchronize do
-              @cond.wait if @subscription_list.empty?
+          return if @subscription_list.empty?
 
+          while !@stopped
+            begin
               # Lock as much shards as we can and get the channel list
               sharded_channels = @redis_block.call { |redis| lock_channel_shards(redis) }
 
@@ -253,7 +253,6 @@ module Verse
               @redis_block.call { |redis| unlock_channel_shards(redis) }
             end
           end
-
         end
 
       end
