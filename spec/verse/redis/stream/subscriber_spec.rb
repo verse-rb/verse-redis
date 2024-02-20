@@ -1,7 +1,7 @@
-require "verse/redis/stream/stream_subscriber"
+require "verse/redis/stream/subscriber/stream"
 require "redis"
 
-RSpec.describe Verse::Redis::Stream::StreamSubscriber do
+RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
   let(:config) {
     {
       max_block_time: 1,
