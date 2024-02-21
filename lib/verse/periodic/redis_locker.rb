@@ -5,9 +5,9 @@ module Verse
     # RedisLocker is a Verse::Periodic::Locker implementation that uses Redis
     # to coordinate task execution.
     class RedisLocker
-      DEFAULT_KEY = "verse:periodic:tasks:%<service_name>s:%<key>s:%<at>s"
+      DEFAULT_KEY = "VERSE:PERIODIC:LOCK:%<service_name>s:%<key>s:%<at>s"
 
-      def initialize(key: DEFAULT_KEY, expire: 86_400, plugin_name: :redis)
+      def initialize(key: DEFAULT_KEY, service_name:, service_id:, expire: 86_400, plugin_name: :redis)
         @key = key
         @expire = expire
         @plugin_name = plugin_name
@@ -19,8 +19,9 @@ module Verse
         lock_acquired = false
         Verse.plugins[@plugin_name].with_client do |redis|
           exp = Time.now + @expire # keep the key 24 hours
-          key = format(@key, service_name: Verse.service_name, key: name, at: at)
-          lock_acquired = redis.set(key, "1", nx: true, ex: exp)
+          key = format(@key, service_name:, key: name, at: at)
+          redis.set(key, service_id, nx: true, ex: exp)
+          lock_acquired = (redis.get(key) == service_id)
         end
 
         # Yield outside of with_client block to release redis connection.

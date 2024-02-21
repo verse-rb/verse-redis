@@ -1,8 +1,20 @@
 # frozen_string_literal: true
 
 RSpec.describe Verse::Periodic::Manager do
+
+  let(:locker_stub) do
+    locker_stub = double("locker")
+
+    allow(locker_stub).to receive(:lock) do |name, at, &block|
+      @lock_called = true
+      block.call
+    end
+
+    locker_stub
+  end
+
   before do
-    @manager = Verse::Periodic::Manager.new
+    @manager = Verse::Periodic::Manager.new locker_stub
   end
 
   after do
@@ -10,7 +22,7 @@ RSpec.describe Verse::Periodic::Manager do
   end
 
   it "run the tasks in the correct order" do
-    the_string = "Verse Periodic is Awesome. We can do anything with it."
+    the_string = "Verse Periodic is Awesome. We can do many things with it."
 
     output = String.new
 
@@ -51,16 +63,12 @@ RSpec.describe Verse::Periodic::Manager do
 
     lock_called = false
 
-    stub_locker = double("locker")
-    allow(stub_locker).to receive(:lock) do |name, at, &block|
+    allow(locker_stub).to receive(:lock) do |name, at, &block|
       lock_called = true
       expect(name).to eq("test")
       expect(at).to be_within(0.001).of(expected_date)
       block.call
     end
-
-    @manager.stop
-    @manager = Verse::Periodic::Manager.new(stub_locker)
 
     output = nil
     task = Verse::Periodic::Task.new("test", @manager, expected_date, per_service: true) do
@@ -75,8 +83,6 @@ RSpec.describe Verse::Periodic::Manager do
     expect(output).to eq("Hello")
 
     expect(lock_called).to be(true)
-
-    @manager.stop
   end
 
 

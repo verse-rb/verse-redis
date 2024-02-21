@@ -28,10 +28,7 @@ RSpec.describe Verse::Periodic::Executioner do
       expect(Verse.logger).to receive(:warn).with("Error in periodic task:")
       expect(Verse.logger).to receive(:warn).with(StandardError)
 
-      @executioner.call(lambda do
-        raise StandardError
-      end)
-
+      @executioner.call(-> { raise StandardError })
       sleep 0.01 until @executioner.empty?
     end
   end
