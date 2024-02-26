@@ -2,9 +2,13 @@ service_name: verse_spec
 description: general testing of verse core.
 
 logging:
-  level: warn
+  level: info
   show_full_error: true
 em:
   adapter: redis
+  config:
+    streams:
+      "example:topic":
+        maxlen: 5
 plugins:
   - name: redis

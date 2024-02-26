@@ -16,17 +16,50 @@ module Verse
 
         attr_reader :service_name, :config, :logger
 
-        def initialize(service_name, config = nil, logger = Logger.new($stdout))
-          @service_name = service_name
+        Subscription = Struct.new(
+          :channel,
+          :mode,
+          :block,
+          keyword_init: true
+        )
+
+        def initialize(service_name:, service_id:, config: nil, logger:)
+          super
+
           @config = validate_config(config)
-          @logger = logger
+          @stopped = true
+
+          @subscriptions = []
+
+          @simple_subscriber = Subscriber::Simple.new(
+            redis: method(:with_redis),
+            service_name:,
+            service_id:,
+            &method(:dispatch_message)
+          )
+
+          @stream_subscriber = Subscriber::Stream.new(
+            @config.stream,
+            consumer_name: service_name,
+            consumer_id: service_id,
+            shards: @config.partitions,
+            redis: method(:with_redis),
+            &method(:dispatch_message)
+          )
         end
 
         def start
+          @stopped = false
           prepare_subscriptions
+
+          @simple_subscriber.start
+          @stream_subscriber.start
         end
 
         def stop
+          @simple_subscriber.stop
+          @stream_subscriber.stop
+          @stopped = true
         end
 
         def with_redis(&block)
@@ -47,9 +80,7 @@ module Verse
           stream = ["VERSE:STREAM", resource_type, shard].join(":")
           simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
 
-          headers = headers.merge(
-            event: event
-          )
+          headers = { event: event }.merge(headers)
 
           message = Message.new(
             self,
@@ -60,6 +91,7 @@ module Verse
           content = message.pack
 
           with_redis do |redis|
+            # Add to the stream if any stream exists.
             redis.xadd(
               stream,
               content,
@@ -165,34 +197,34 @@ module Verse
         # @param channel [String] The channel to subscribe to
         # @param mode [Symbol] The mode of the subscription
         # @param block [Proc] The block to execute when a message is received
-        # @return [Verse::Event::Subscription] The subscription object
         def subscribe(channel, mode = Verse::Event::Manager::MODE_CONSUMER, &block)
-          case mode
-          when Verse::Event::Manager::MODE_BROADCAST
-            subscribe_broadcast channel, &block
-          when Verse::Event::Manager::MODE_CONSUMER
-            subscribe_consumer channel, &block
-          when Verse::Event::Manager::MODE_COMMAND
-            subscribe_command channel, &block
-          else
-            raise ArgumentError, "mode must be :broadcast, :command, :non_persistent"
+          raise "cannot subscribe when started" unless @stopped
+
+          unless Event::Manager::ALL_MODES.include?(mode)
+            raise ArgumentError, "mode must be #{Event::Manager::ALL_MODES.map(&:inspect).join(", ")}, but `#{mode}` given"
           end
+
+          @subscriptions << Subscription.new(
+            channel: channel,
+            mode: mode,
+            block: block
+          )
         end
 
-        def subscribe_consumer(channel, &block)
-          consumer_group = Verse.service_name
-          consumer_id = Verse.service_id
+        def dispatch_message(channel, message)
+          logger.debug{ "dispatch message #{channel} #{message}" }
 
-          with_redis do |rd|
-            rd.xreadgroup(
-              consumer_group,
-              consumer_id,
-              channel,
-              '>',
-              count: 1,
-              block: 15)
+          unpacked_message = Message.unpack(self, message["msg"])
+
+          @subscriptions.select{ |sub| sub.channel == channel }.each do |sub|
+            sub.block.call(unpacked_message, channel)
+          rescue => e
+            logger.error{ "Error while processing message on channel #{channel}: #{e.message}" }
+            logger.error{ e.backtrace.join("\n") }
           end
-
+        rescue => e
+          logger.error{ "Error while processing message: #{e.message}" }
+          logger.error{ e.backtrace.join("\n") }
         end
 
         private
@@ -218,6 +250,18 @@ module Verse
           raise "Invalid config for redis plugin: #{result.errors}"
         end
 
+        def prepare_subscriptions
+          @subscriptions.each do |sub|
+            case sub.mode
+            when Event::Manager::MODE_CONSUMER
+              @stream_subscriber.subscribe(sub.channel)
+            when Event::Manager::MODE_COMMAND
+              @simple_subscriber.subscribe(sub.channel, lock: true)
+            when Event::Manager::MODE_BROADCAST
+              @simple_subscriber.subscribe(sub.channel, lock: false)
+            end
+          end
+        end
 
       end
     end

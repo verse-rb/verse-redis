@@ -7,7 +7,7 @@ module Verse
           attr_reader :block, :channels
 
           def initialize(redis:, &block)
-            @redis_block = redis.is_a?(Proc) ? redis : -> (&block) { block.call(redis) }
+            @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : -> (&block) { block.call(redis) }
             @block = block
             @channels = []
             @stopped = true
@@ -25,7 +25,7 @@ module Verse
             @stopped = true
           end
 
-          def listen_channel(channel, lock: false)
+          def subscribe(channel, lock: false)
             raise "cannot listen to a channel while the subscriber is running" unless @stopped
             @channels << [channel, lock]
           end
@@ -34,7 +34,7 @@ module Verse
             @block.call(channel, message)
           end
 
-          alias :<< :listen_channel
+          alias :<< :subscribe
         end
       end
     end

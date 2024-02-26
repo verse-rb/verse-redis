@@ -16,6 +16,9 @@ module Verse
 
           def start
             super
+
+            return if channels.empty?
+
             @thread = Thread.new{ listen }
             @thread.name = "Verse Redis EM - Basic Subscriber"
           end

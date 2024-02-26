@@ -5,7 +5,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
     @queue = Queue.new
 
     Verse.on_boot do
-      Verse.event_manager.subscribe("example:topic") do |message, subject|
+      Verse.event_manager.subscribe("example:topic") do |message, channel|
         @queue.push(message)
       end
     end
@@ -20,17 +20,28 @@ RSpec.describe Verse::Redis::Stream::EventManager do
     end
   end
 
-  let(:queue){ Queue.new }
+  after do
+    Verse.stop
+  end
+
+  let(:queue){ @queue }
 
   context "#publish" do
     it "can publish a message" do
-      Verse.publish(
-        "example:topic",
-        "This is a payload",
-        headers: { header1: "value1"}
-      )
+      sleep 0.05
 
-      message = queue.pop
+      5.times do
+        Verse.publish(
+          "example:topic",
+          "This is a payload",
+          headers: { header1: "value1"}
+        )
+      end
+
+      5.times do
+        queue.pop
+      end
+
     end
   end
 end

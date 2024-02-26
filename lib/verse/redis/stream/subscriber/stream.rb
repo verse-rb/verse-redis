@@ -56,6 +56,9 @@ module Verse
 
           def start
             super
+
+            return if channels.empty?
+
             @thread = Thread.new{ run }
             @thread.name = "Verse Redis EM - Stream Subscriber"
           end
@@ -68,6 +71,8 @@ module Verse
           protected
 
           def validate_config(config)
+            return config if config.is_a?(Config)
+
             result = ConfigSchema.validate(config)
 
             return result.value if result.success?
@@ -180,7 +185,7 @@ module Verse
             if e.message.include?("NOGROUP")
               # create stream(s), attach group
               channels.each do |channel|
-                Verse.logger.debug { "Create consumer group #{@consumer_name} for #{channel}" }
+                Verse.logger.info { "Create consumer group #{@consumer_name} for #{channel}" }
                 redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
               end
 

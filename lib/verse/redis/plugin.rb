@@ -75,6 +75,8 @@ module Verse
 
       def release_connection(cnx)
         @connection_pool << cnx
+      rescue ClosedQueueError
+        # The pool is closed, we can safely ignore this error
       end
 
       def create_connection

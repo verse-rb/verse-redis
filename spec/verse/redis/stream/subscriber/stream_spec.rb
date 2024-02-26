@@ -94,7 +94,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
 
   context "#run" do
     it "collect messages from the stream" do
-      subject.listen_channel("VERSE:STREAM:test_channel")
+      subject.subscribe("VERSE:STREAM:test_channel")
       subject.start
 
       # ensure the consumers are created as they start consuming

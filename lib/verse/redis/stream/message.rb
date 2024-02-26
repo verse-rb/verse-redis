@@ -37,7 +37,7 @@ module Verse
 
         def self.unpack(manager, data)
           hash = MessagePack.unpack(Zlib::Inflate.inflate(data))
-          new(manager, hash[:content], headers: hash[:headers], reply_to: hash[:reply_to])
+          new(manager, hash["content"], headers: hash["headers"], reply_to: hash["reply_to"])
         end
 
         def ack

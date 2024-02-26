@@ -48,8 +48,8 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
   context "publish/subscribe" do
     it "Receive broadcast messages" do
-      subscriber_a.listen_channel("test_channel", lock: false)
-      subscriber_b.listen_channel("test_channel", lock: false)
+      subscriber_a.subscribe("test_channel", lock: false)
+      subscriber_b.subscribe("test_channel", lock: false)
 
       subscriber_a.start
       subscriber_b.start
@@ -72,8 +72,8 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
     end
 
     it "subscribe with lock" do
-      subscriber_a.listen_channel("per_service_message", lock: true)
-      subscriber_b.listen_channel("per_service_message", lock: true)
+      subscriber_a.subscribe("per_service_message", lock: true)
+      subscriber_b.subscribe("per_service_message", lock: true)
 
       subscriber_a.start
       subscriber_b.start
@@ -97,8 +97,8 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
 
     it "stress test" do
-      subscriber_a.listen_channel("stress_test", lock: true)
-      subscriber_b.listen_channel("stress_test", lock: true)
+      subscriber_a.subscribe("stress_test", lock: true)
+      subscriber_b.subscribe("stress_test", lock: true)
 
       subscriber_a.start
       subscriber_b.start
