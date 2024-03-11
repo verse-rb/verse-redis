@@ -79,14 +79,16 @@ module Verse
         def publish_resource_event(resource_type:, resource_id:, event:, payload:, headers: {})
           shard = find_partition(resource_id)
 
-          stream = ["VERSE:STREAM", resource_type, shard].join(":")
+          stream = ["VERSE:STREAM:RESOURCE", resource_type, shard].join(":")
           simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
+
+          puts "PUBLISH ON #{stream}"
 
           headers = { event: event }.merge(headers)
 
           message = Message.new(
-            self,
             payload,
+            manager: self,
             headers: headers
           )
 
@@ -94,12 +96,13 @@ module Verse
 
           with_redis do |redis|
             # Add to the stream if any stream exists.
+
             redis.xadd(
               stream,
-              content,
+              {msg: content},
               nomkstream: true,
               approximate: true,
-              maxlen: max_len
+              maxlen: config.maxlen
             )
 
             # add to the fire and forget event stream
@@ -213,10 +216,41 @@ module Verse
           )
         end
 
+        def subscribe_resource_event(resource_type:, event:, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
+          logger.debug{ "subscribe resource event #{resource_type}##{event} in mode #{mode}" }
+
+          stream_id = \
+            case mode
+            when Event::Manager::MODE_CONSUMER
+              ["VERSE:STREAM:RESOURCE", resource_type].join(":")
+            else
+              ["VERSE:RESOURCE:", resource_type, event].join(":")
+            end
+
+          logger.debug{ "subscribe on #{stream_id}" }
+
+          callback = ->(message, channel) do
+            block.call(message, channel) if message.headers["event"] == event
+          end
+
+          @subscriptions << Subscription.new(
+            channel: stream_id,
+            mode: mode,
+            block: callback
+          )
+
+        end
+
         def dispatch_message(channel, message)
           logger.debug{ "dispatch message #{channel} #{message}" }
 
-          @subscriptions.select{ |sub| sub.channel == channel }.each do |sub|
+          @subscriptions.select{ |sub|
+            if sub.mode == Event::Manager::MODE_CONSUMER
+              channel.start_with?(sub.channel)
+            else
+              sub.channel == channel
+            end
+          }.each do |sub|
             sub.block.call(message, channel)
           rescue => e
             logger.error{ "Error while processing message on channel #{channel}: #{e.message}" }
@@ -239,7 +273,7 @@ module Verse
         def find_partition(key)
           key.to_s.each_byte.reduce(0) do |a, e|
             (e + a * 498_975_571 + 548_897_941) & 0xffffffff
-          end & 15
+          end % @config.partitions
         end
 
         def validate_config(config)
