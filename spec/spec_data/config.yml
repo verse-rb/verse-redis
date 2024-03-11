@@ -12,3 +12,5 @@ em:
         maxlen: 5
 plugins:
   - name: redis
+    config:
+      max_connections: 10

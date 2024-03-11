@@ -6,8 +6,9 @@ module Verse
 
           attr_reader :block, :channels
 
-          def initialize(redis:, &block)
+          def initialize(redis:, manager:, &block)
             @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : -> (&block) { block.call(redis) }
+            @manager = manager
             @block = block
             @channels = []
             @stopped = true

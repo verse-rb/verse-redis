@@ -7,45 +7,55 @@ module Verse
       # A naive implementation of a message for Redis Streams
       # using msgpack and zlib to compress the message.
       class Message < Verse::Event::Message
-        attr_reader :id, :stream, :consumer_group
+        attr_reader :id, :channel, :consumer_group
 
         def initialize(
-          manager,
           content,
           headers: {},
+          manager: nil,
           reply_to: nil,
           id: nil,
-          stream: nil,
+          channel: nil,
           consumer_group: nil
         )
-          @id     = id
-          @stream = stream
+          @id     = id || SecureRandom.random_number(2 << 48).to_s(36)
+
+          @channel = channel
           @consumer_group = consumer_group
 
-          super(manager, content, headers: headers, reply_to: reply_to)
+          super(content, manager:, headers:, reply_to:)
         end
 
         def pack
           Zlib::Deflate.deflate(
             {
-              content: @content,
-              headers: @headers,
-              reply_to: @reply_to
+              i: @id,
+              c: @content,
+              h: @headers,
+              r: @reply_to
             }.to_msgpack
           )
         end
 
-        def self.unpack(manager, data)
+        def self.unpack(manager, data, channel: nil, consumer_group: nil)
           hash = MessagePack.unpack(Zlib::Inflate.inflate(data))
-          new(manager, hash["content"], headers: hash["headers"], reply_to: hash["reply_to"])
+
+          new(hash["c"],
+            headers: hash["h"],
+            reply_to: hash["r"],
+            id: hash["i"],
+            manager:,
+            channel:,
+            consumer_group:
+          )
         end
 
         def ack
-          unless @id && @stream && @consumer_group
-            raise "Cannot ack message without id, stream and consumer_group"
+          unless @id && @channel && @consumer_group
+            raise "Cannot ack message without id, channel and consumer_group"
           end
 
-          manager.with_redis{ |rd| rd.xack(@stream, @consumer_group, @id) }
+          manager.with_redis{ |rd| rd.xack(@channel, @consumer_group, @id) }
         end
 
       end

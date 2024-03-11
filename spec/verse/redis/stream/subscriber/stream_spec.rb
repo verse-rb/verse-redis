@@ -35,6 +35,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
 
   subject do
     described_class.new(config,
+      manager: nil,
       consumer_name: "test_group",
       consumer_id: "test_id",
       redis: redis_listener,
@@ -102,10 +103,11 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       sleep 0.1
 
       # Works with no-sharding
-      redis.xadd("VERSE:STREAM:test_channel", {a: 1})
+      msg = Verse::Redis::Stream::Message.new({a: 1})
+      redis.xadd("VERSE:STREAM:test_channel", {msg: msg.pack})
 
       message = queue.pop
-      expect(@messages["VERSE:STREAM:test_channel"]).to eq([{"a" => "1"}])
+      expect(@messages["VERSE:STREAM:test_channel"].map(&:content)).to eq([{"a" => 1}])
     end
   end
 

@@ -8,8 +8,9 @@ module Verse
 
           attr_reader :service_name, :service_id
 
-          def initialize(redis:, service_name:, service_id:, &block)
-            super(redis:, &block)
+          def initialize(redis:, manager:, service_name:, service_id:, &block)
+            super(redis:, manager:, &block)
+
             @service_name = service_name
             @service_id = service_id
           end
@@ -28,8 +29,8 @@ module Verse
             @thread&.kill
           end
 
-          def lock(redis, channel, &block)
-            lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}"
+          def lock(redis, channel, msgid, &block)
+            lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}:#{msgid}"
 
             redis.set(lock_key, service_id, nx: true, ex: 600, &block)
 
@@ -45,18 +46,20 @@ module Verse
                 end
 
                 on.message do |channel, message|
+                  unpacked_message = Message.unpack(@manager, message, channel: channel)
+
                   has_lock = lock_set[channel]
 
                   if has_lock
-                    lock(r, channel) do
+                    lock(r, channel, unpacked_message.id) do
                       # per service message
                       Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
-                      process_message(channel, message)
+                      process_message(channel, unpacked_message)
                     end
                   else
                     # broadcasted message
                     Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
-                    process_message(channel, message)
+                    process_message(channel, unpacked_message)
                   end
                 end
               end

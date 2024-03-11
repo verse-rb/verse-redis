@@ -33,6 +33,7 @@ module Verse
 
           @simple_subscriber = Subscriber::Simple.new(
             redis: method(:with_redis),
+            manager: self,
             service_name:,
             service_id:,
             &method(:dispatch_message)
@@ -40,6 +41,7 @@ module Verse
 
           @stream_subscriber = Subscriber::Stream.new(
             @config.stream,
+            manager: self,
             consumer_name: service_name,
             consumer_id: service_id,
             shards: @config.partitions,
@@ -107,7 +109,7 @@ module Verse
 
         # Publish an event to a specific channel.
         def publish(channel, content, headers: {}, key: nil, reply_to: nil)
-          message = Message.new(self, content, headers: headers, reply_to: reply_to)
+          message = Message.new(content, manager: self, headers: headers, reply_to: reply_to)
 
           packed_message = message.pack
 
@@ -214,10 +216,8 @@ module Verse
         def dispatch_message(channel, message)
           logger.debug{ "dispatch message #{channel} #{message}" }
 
-          unpacked_message = Message.unpack(self, message["msg"])
-
           @subscriptions.select{ |sub| sub.channel == channel }.each do |sub|
-            sub.block.call(unpacked_message, channel)
+            sub.block.call(message, channel)
           rescue => e
             logger.error{ "Error while processing message on channel #{channel}: #{e.message}" }
             logger.error{ e.backtrace.join("\n") }

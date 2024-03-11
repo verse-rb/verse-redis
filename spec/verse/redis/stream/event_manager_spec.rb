@@ -18,7 +18,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
   let(:queue){ @queue }
 
   context "#publish" do
-    it "can publish and receive a message (mode consumer)" do
+    it "can publish and receive a message (MODE_CONSUMER)" do
       total_events = 0
 
       Verse.on_boot do
@@ -34,8 +34,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         config_path: "./spec/spec_data/config.yml"
       )
 
-      puts "plugin = #{Verse::Plugin[:redis]}"
-
       em2 = Verse::Redis::Stream::EventManager.new(
         service_name: "verse_spec",
         service_id: "1234", # random ID
@@ -43,7 +41,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      puts "SUBSCRIBE 2"
       em2.subscribe("example:topic", Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
@@ -74,19 +71,95 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       expect(total_events).to eq(5)
     end
 
-    it "can publish and receive a message (mode broadcast)" do
+    it "can publish and receive a message (MODE_BROADCAST)" do
+      total_events = 0
+
+      Verse.on_boot do
+        # Creating the real event manager
+        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
+          @queue.push(message)
+          total_events += 1
+        end
+      end
+
       Verse.start(
         :test,
         config_path: "./spec/spec_data/config.yml"
       )
 
+      em2 = Verse::Redis::Stream::EventManager.new(
+        service_name: "verse_spec",
+        service_id: "1234", # random ID
+        config: {},
+        logger: Verse.logger
+      )
+
+      em2.subscribe("example:topic", Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
+        # Creating another one to deal with concurrency with consumers
+        @queue.push(message)
+        total_events += 1
+      end
+
+      Verse.on_stop do
+        em2.stop
+      end
+
+      em2.start
+
+      sleep 0.05 # be sure that the threads have created the consumers
+
+      5.times do
+        Verse.publish(
+          "example:topic",
+          "This is a payload",
+          headers: { header1: "value1"}
+        )
+      end
+
+      10.times do
+        queue.pop
+      end
+
+      # Received each event only once.
+      expect(total_events).to eq(10)
+    end
+
+    it "can publish and receive a message (MODE_COMMAND)" do
+      total_events = 0
+
       Verse.on_boot do
-        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
+        # Creating the real event manager
+        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_COMMAND) do |message, channel|
           @queue.push(message)
+          total_events += 1
         end
       end
 
-      sleep 0.05
+      Verse.start(
+        :test,
+        config_path: "./spec/spec_data/config.yml"
+      )
+
+      em2 = Verse::Redis::Stream::EventManager.new(
+        service_name: "verse_spec",
+        service_id: "1234", # random ID
+        config: {},
+        logger: Verse.logger
+      )
+
+      em2.subscribe("example:topic", Verse::Event::Manager::MODE_COMMAND) do |message, channel|
+        # Creating another one to deal with concurrency with consumers
+        @queue.push(message)
+        total_events += 1
+      end
+
+      Verse.on_stop do
+        em2.stop
+      end
+
+      em2.start
+
+      sleep 0.05 # be sure that the threads have created the consumers
 
       5.times do
         Verse.publish(
@@ -100,8 +173,9 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         queue.pop
       end
 
+      # Received each event only once.
+      expect(total_events).to eq(5)
     end
-
   end
 
 end

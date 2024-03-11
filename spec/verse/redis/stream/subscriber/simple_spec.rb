@@ -24,9 +24,12 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
   let(:queue) { Queue.new }
 
+  let(:message) { Verse::Redis::Stream::Message.new("This is a message")}
+
   subject(:subscriber_a) do
     described_class.new(
       redis: Redis.new,
+      manager: nil,
       service_name: "test:service",
       service_id: "a",
     ) do |channel, message|
@@ -38,6 +41,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
   subject(:subscriber_b) do
     described_class.new(
       redis: Redis.new,
+      manager: nil,
       service_name: "test:service",
       service_id: "b",
     ) do |channel, message|
@@ -56,13 +60,13 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
       sleep(0.1) # Wait for subscription to start
 
-      redis.publish("test_channel", "This is a message")
+      redis.publish("test_channel", message.pack)
 
       # Received for each subscriber:
       queue.pop
       queue.pop
 
-      expect(@messages["test_channel"]).to eq([
+      expect(@messages["test_channel"].map(&:content)).to eq([
         "This is a message",
         "This is a message"
       ])
@@ -80,14 +84,14 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
       sleep(0.1) # Wait for subscription
 
-      redis.publish("per_service_message", "yet another message")
+      redis.publish("per_service_message", Verse::Redis::Stream::Message.new("yet another message").pack)
 
       # Only one subscriber received the message
       queue.pop
 
       sleep(0.05)
       expect(queue.size).to eq(0)
-      expect(@messages["per_service_message"]).to eq([
+      expect(@messages["per_service_message"].map(&:content)).to eq([
         "yet another message"
       ])
     ensure
@@ -106,7 +110,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       sleep(0.1) # Wait for subscription to start
 
       100.times do |i|
-        redis.publish("stress_test", "message #{i}")
+        redis.publish("stress_test", Verse::Redis::Stream::Message.new("test #{i}").pack )
       end
 
       100.times{ queue.pop }

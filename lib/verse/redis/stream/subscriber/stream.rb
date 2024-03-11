@@ -39,8 +39,8 @@ module Verse
           # @param redis_block [Proc] The block to execute to get a redis connection
           # @param shards [Integer] The number of shards to use
           # @param block [Proc] The block to execute when a message is received
-          def initialize(config, consumer_name:, consumer_id:, redis:, shards: 16, &block)
-            super(redis: redis, &block)
+          def initialize(config, manager:, consumer_name:, consumer_id:, redis:, shards: 16, &block)
+            super(redis:, manager:, &block)
 
             @sha_scripts = {}
 
@@ -186,7 +186,12 @@ module Verse
               # create stream(s), attach group
               channels.each do |channel|
                 Verse.logger.info { "Create consumer group #{@consumer_name} for #{channel}" }
-                redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
+                begin
+                  redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
+                rescue ::Redis::CommandError => e
+                  # ignore if BUSYGROUP
+                  raise unless e.message.include?("BUSYGROUP")
+                end
               end
 
               {} # return nothing for this loop...
@@ -237,6 +242,7 @@ module Verse
                   output.each do |channel, messages|
                     messages.each do |(_, message)|
                       begin
+                        message = Message.unpack(self, message["msg"])
                         process_message(channel, message)
                       rescue => e
                         # log the error but continue to process messages
