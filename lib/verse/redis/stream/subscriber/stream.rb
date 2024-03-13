@@ -59,6 +59,8 @@ module Verse
 
             return if channels.empty?
 
+            redis{ |r| init_groups(r, channels) }
+
             @thread = Thread.new{ run }
             @thread.name = "Verse Redis EM - Stream Subscriber"
           end
@@ -169,6 +171,24 @@ module Verse
             ].min
           end
 
+          def init_groups(redis, channels)
+            channels = self.channels.map(&:first).map{  |c|
+              [c, *(@shards.times.map{ |i| "#{c}:#{i}"}) ]
+            }.flatten
+
+            # create stream(s), attach group
+            channels.each do |channel|
+              begin
+                redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
+                Verse.logger.info { "create consumer group #{@consumer_name} for #{channel}" }
+              rescue ::Redis::CommandError => e
+                puts e.message
+                # ignore if BUSYGROUP
+                raise unless e.message.include?("BUSYGROUP")
+              end
+            end
+          end
+
           def read_stream(redis, channels)
             redis.xreadgroup(
               @consumer_name,
@@ -182,18 +202,9 @@ module Verse
           rescue ::Redis::TimeoutError
             {} # No message, normal behavior
           rescue ::Redis::CommandError => e
-            if e.message.include?("NOGROUP")
-              # create stream(s), attach group
-              channels.each do |channel|
-                Verse.logger.info { "Create consumer group #{@consumer_name} for #{channel}" }
-                begin
-                  redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
-                rescue ::Redis::CommandError => e
-                  # ignore if BUSYGROUP
-                  raise unless e.message.include?("BUSYGROUP")
-                end
-              end
+            puts e.message
 
+            if e.message.include?("NOGROUP")
               {} # return nothing for this loop...
             else
               raise

@@ -82,8 +82,6 @@ module Verse
           stream = ["VERSE:STREAM:RESOURCE", resource_type, shard].join(":")
           simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
 
-          puts "PUBLISH ON #{stream}"
-
           headers = { event: event }.merge(headers)
 
           message = Message.new(
@@ -202,7 +200,7 @@ module Verse
         # @param channel [String] The channel to subscribe to
         # @param mode [Symbol] The mode of the subscription
         # @param block [Proc] The block to execute when a message is received
-        def subscribe(channel, mode = Verse::Event::Manager::MODE_CONSUMER, &block)
+        def subscribe(channel, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
           raise "cannot subscribe when started" unless @stopped
 
           unless Event::Manager::ALL_MODES.include?(mode)
@@ -244,7 +242,7 @@ module Verse
         def dispatch_message(channel, message)
           logger.debug{ "dispatch message #{channel} #{message}" }
 
-          @subscriptions.select{ |sub|
+          @subscriptions.lazy.select{ |sub|
             if sub.mode == Event::Manager::MODE_CONSUMER
               channel.start_with?(sub.channel)
             else
