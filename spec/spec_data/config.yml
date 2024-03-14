@@ -13,4 +13,4 @@ em:
 plugins:
   - name: redis
     config:
-      max_connections: 10
+      max_connections: 20

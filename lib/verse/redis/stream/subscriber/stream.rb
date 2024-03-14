@@ -182,8 +182,7 @@ module Verse
                 redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
                 Verse.logger.info { "create consumer group #{@consumer_name} for #{channel}" }
               rescue ::Redis::CommandError => e
-                puts e.message
-                # ignore if BUSYGROUP
+                # ignore if BUSYGROUP it means the group already exists
                 raise unless e.message.include?("BUSYGROUP")
               end
             end

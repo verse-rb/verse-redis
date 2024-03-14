@@ -23,7 +23,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
+        Verse.event_manager.subscribe("example:topic", mode: Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
           @queue.push(message)
           total_events += 1
         end
@@ -41,7 +41,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
+      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_CONSUMER) do |message, channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
         total_events += 1
@@ -52,8 +52,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       end
 
       em2.start
-
-      sleep 0.05 # be sure that the threads have created the consumers
 
       5.times do
         Verse.publish(
@@ -76,7 +74,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
+        Verse.event_manager.subscribe("example:topic", mode: Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
           @queue.push(message)
           total_events += 1
         end
@@ -94,7 +92,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
+      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_BROADCAST) do |message, channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
         total_events += 1
@@ -106,7 +104,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       em2.start
 
-      sleep 0.05 # be sure that the threads have created the consumers
+      sleep(0.05)
 
       5.times do
         Verse.publish(
@@ -129,7 +127,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic", Verse::Event::Manager::MODE_COMMAND) do |message, channel|
+        Verse.event_manager.subscribe("example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, channel|
           @queue.push(message)
           total_events += 1
         end
@@ -147,7 +145,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", Verse::Event::Manager::MODE_COMMAND) do |message, channel|
+      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
         total_events += 1
@@ -158,8 +156,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       end
 
       em2.start
-
-      sleep 0.05 # be sure that the threads have created the consumers
 
       5.times do
         Verse.publish(
@@ -217,8 +213,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       end
 
       em2.start
-
-      sleep 0.05 # be sure that the threads have created the consumers
 
       5.times do |x|
         Verse.publish_resource_event(
