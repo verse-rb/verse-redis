@@ -202,8 +202,6 @@ module Verse
           rescue ::Redis::TimeoutError
             {} # No message, normal behavior
           rescue ::Redis::CommandError => e
-            puts e.message
-
             raise unless e.message.include?("NOGROUP")
 
             {} # return nothing for this loop...

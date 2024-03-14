@@ -31,7 +31,7 @@ module Verse
 
             synchronize do
               @thread = Thread.new { listen }
-              @thread.name = "Verse Redis EM - Basic Subscriber"
+              @thread.name = "Verse Redis EM - Simple Subscriber"
 
               @cond.wait
             end
@@ -46,8 +46,8 @@ module Verse
             redis do |r|
               lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}:#{msgid}"
 
-              r.set(lock_key, service_id, nx: true, ex: 600, &block)
-              yield if r.get(lock_key) == service_id
+              r.set(lock_key, service_id, nx: true, ex: 600)
+              yield if r.get(lock_key) == service_id.to_s
             end
           end
 
@@ -64,6 +64,7 @@ module Verse
             has_lock = @lock_set[channel]
 
             if has_lock
+              Verse.logger.debug { "Try lock on `#{channel}` (#{unpacked_message.id})" }
               lock(channel, unpacked_message.id) do
                 # per service message
                 Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
@@ -77,6 +78,13 @@ module Verse
           end
 
           def listen
+            # ensure that the thread doesn't start before condition#wait is called.
+            # This case is happening randomly and very rarely, as we don't have
+            # control over the thread scheduling.
+            # That's could potentially ruin everything and is so hard to debug,
+            # leading to the process hanging forever :(
+            synchronize{}
+
             redis do |r|
               r.subscribe(*@lock_set.keys) do |on|
                 on.subscribe(&method(:on_subscribe))

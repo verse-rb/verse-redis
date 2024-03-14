@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "securerandom"
+require "monitor"
 
 require_relative "./subscriber/stream"
 require_relative "./subscriber/simple"
@@ -13,6 +14,8 @@ module Verse
     module Stream
       class EventManager < Verse::Event::Manager::Base
         Verse::Event::Manager.add_event_manager_type(:redis, self)
+
+        include MonitorMixin
 
         attr_reader :service_name, :config, :logger
 
@@ -147,9 +150,10 @@ module Verse
         # @param timeout [Float] The timeout of the request
         # @return Promise<Message> The response of the request
         # @raise [Verse::Error::Timeout] If the request timed out
-        def request(channel, content, headers: {}, reply_to: nil, timeout: 0.5)
+        def request(channel, content = {}, headers: {}, reply_to: nil, timeout: 0.5)
           reply_to ||= "REPLY_TO:#{SecureRandom.hex}"
 
+          cond = new_cond
           q = Queue.new
 
           thread = nil
@@ -157,18 +161,29 @@ module Verse
           msgpacked =
             Message.new(content, manager: self, headers:, reply_to:).pack
 
-          thread = Thread.new do
-            with_redis do |rd|
-              rd.subscribe_with_timeout(timeout, reply_to) do |on|
-                on.message do |channel, message|
-                  logger.debug { "Received reply message on #{channel}: #{message.size}" }
-                  q.push(Message.unpack(self, message))
+          synchronize do
+            thread = Thread.new do
+              synchronize{ } # Stop the thread until the wait block is called below.
+              with_redis do |rd|
+                rd.subscribe_with_timeout(timeout, reply_to) do |on|
+                  on.subscribe do
+                    synchronize{ cond.signal }
+                  end # notify the main thread that the subscription is ready
+
+                  on.message do |channel, message|
+                    logger.debug { "Received reply message on #{channel}: #{message.size}" }
+                    q.push(Message.unpack(self, message))
+                  end
                 end
               end
             end
-          end
 
-          with_redis{ |rd| rd.publish(channel, msgpacked) }
+            cond.wait # ensure that the subscription process done before sending the message
+            with_redis{ |rd|
+              logger.debug { "publishing on `#{channel}` (#{msgpacked.size} bytes)" }
+              rd.publish(channel, msgpacked)
+            }
+          end
 
           Timeout.timeout(timeout) do
             out = q.pop
@@ -184,26 +199,44 @@ module Verse
         # @param headers [Hash] The headers of the message (if any)
         # @param timeout [Float] The timeout of the request
         # @return Promise<[Array<Message>]> The responses of the request
-        def request_all(channel, content, headers: {}, reply_to: nil, timeout: 0.5)
+        def request_all(channel, content = {}, headers: {}, reply_to: nil, timeout: 0.5)
           reply_to ||= "REPLY_TO:#{SecureRandom.hex}"
 
-          responses = []
+          output = []
+          cond = new_cond
+          thread = nil
 
-          with_redis do |rd|
-            msgpacked =
-              Message.new(self, content, headers:, reply_to:).to_msgpack
+          msgpacked =
+            Message.new(content, manager: self, headers:, reply_to:).pack
 
-            rd.subscribe_with_timeout(reply_to) do |on|
-              on.message do |_channel, _message|
-                responses << Message.from(payload)
+          synchronize do
+            thread = Thread.new do
+              synchronize{ } # Stop the thread until the wait block is called below.
+              with_redis do |rd|
+                rd.subscribe_with_timeout(timeout, reply_to) do |on|
+                  on.subscribe do
+                    synchronize{ cond.signal }
+                  end # notify the main thread that the subscription is ready
+
+                  on.message do |channel, message|
+                    logger.debug { "Received reply message on #{channel}: #{message.size}" }
+                    synchronize{ output << Message.unpack(self, message) }
+                  end
+                end
               end
             end
 
-            rd.publish(channel, msgpacked)
+            cond.wait # ensure that the subscription process done before sending the message
+
+            with_redis{ |rd|
+              logger.debug { "publishing on `#{channel}` (#{msgpacked.size} bytes)" }
+              rd.publish(channel, msgpacked)
+            }
           end
 
-          sleep timeout
-          responses
+          sleep(timeout)
+          thread.kill
+          output
         end
 
         # Subscribe to a specific channel in a specific mode
