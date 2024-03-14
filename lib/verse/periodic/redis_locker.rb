@@ -9,10 +9,10 @@ module Verse
 
       attr_reader :service_name, :service_id
 
-      def initialize(service_name:, service_id:, key: DEFAULT_KEY, expire: 86_400, plugin_name: :redis)
+      def initialize(service_name:, service_id:, redis:, key: DEFAULT_KEY, expire: 86_400)
         @key = key
         @expire = expire
-        @plugin_name = plugin_name
+        @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : ->(&block) { block.call(redis) }
 
         @service_name = service_name
         @service_id = service_id
@@ -22,7 +22,7 @@ module Verse
         raise ArgumentError, "block is required" unless block_given?
 
         lock_acquired = false
-        Verse.plugins[@plugin_name].with_client do |redis|
+        @redis_block.call do |redis|
           exp = Time.now + @expire # keep the key 24 hours
           key = format(@key, service_name:, key: name, at:)
           redis.set(key, service_id, nx: true, ex: exp)
