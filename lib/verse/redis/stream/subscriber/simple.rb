@@ -1,10 +1,13 @@
 require_relative "./base"
+require "monitor"
 
 module Verse
   module Redis
     module Stream
       module Subscriber
         class Simple < Base
+
+          include MonitorMixin
 
           attr_reader :service_name, :service_id
 
@@ -13,6 +16,8 @@ module Verse
 
             @service_name = service_name
             @service_id = service_id
+
+            @cond = new_cond
           end
 
           def start
@@ -20,8 +25,12 @@ module Verse
 
             return if channels.empty?
 
-            @thread = Thread.new{ listen }
-            @thread.name = "Verse Redis EM - Basic Subscriber"
+            synchronize do
+              @thread = Thread.new{ listen }
+              @thread.name = "Verse Redis EM - Basic Subscriber"
+
+              @cond.wait
+            end
           end
 
           def stop
@@ -42,7 +51,10 @@ module Verse
               lock_set = channels.to_h
               r.subscribe(*lock_set.keys) do |on|
                 on.subscribe do |channel, _|
-                  Verse.logger.debug{ "Subscribed to `#{channel}`" }
+                  synchronize do
+                    Verse.logger.debug{ "Subscribed to `#{channel}`" }
+                    @cond.signal # Signal that subscription is ready. #start method will stop waiting
+                  end
                 end
 
                 on.message do |channel, message|

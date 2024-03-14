@@ -104,8 +104,6 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       em2.start
 
-      sleep(0.05)
-
       5.times do
         Verse.publish(
           "example:topic",
