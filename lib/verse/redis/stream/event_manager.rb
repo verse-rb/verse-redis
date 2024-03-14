@@ -119,6 +119,7 @@ module Verse
             # to prevent to pass the message twice.
 
             # Publish on non-persistent channel
+            logger.debug{ "Publishing on channel #{channel} (#{packed_message.size} bytes)" }
             rd.publish(channel, packed_message)
 
             # Publish on persistent channel
@@ -151,20 +152,29 @@ module Verse
 
           q = Queue.new
 
-          with_redis do |rd|
-            msgpacked =
-              Message.new(self, content, headers:, reply_to:).to_msgpack
+          thread = nil
 
-            rd.subscribe_with_timeout(reply_to) do |on|
-              on.message do |_channel, _message|
-                q.push(Message.from(payload))
+          msgpacked =
+            Message.new(content, manager: self, headers:, reply_to:).pack
+
+          thread = Thread.new do
+            with_redis do |rd|
+              rd.subscribe_with_timeout(timeout, reply_to) do |on|
+                on.message do |channel, message|
+                  logger.debug { "Received reply message on #{channel}: #{message.size}" }
+                  q.push(Message.unpack(self, message))
+                end
               end
             end
-
-            rd.publish(channel, msgpacked)
           end
 
-          q.pop(timeout)
+          with_redis{ |rd| rd.publish(channel, msgpacked) }
+
+          Timeout.timeout(timeout) do
+            out = q.pop
+            thread.kill
+            out
+          end
         end
 
         # Send request to multiple subscribers. Wait until timeout and

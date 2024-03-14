@@ -2,7 +2,7 @@ service_name: verse_spec
 description: general testing of verse core.
 
 logging:
-  level: info
+  level: debug
   show_full_error: true
 em:
   adapter: redis

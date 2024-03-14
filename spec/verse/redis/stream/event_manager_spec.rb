@@ -15,7 +15,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
   let(:queue) { @queue }
 
-  context "#publish" do
+  context "#publish and #subscribe" do
     it "can publish and receive a message (MODE_CONSUMER)" do
       total_events = 0
 
@@ -229,5 +229,40 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       # Received each event only once.
       expect(total_events).to eq(5)
     end
+
+
   end
+
+  context "#request and #request_all" do
+    it "can request and receive a message" do
+      total_events = 0
+
+      queue = Queue.new
+
+      Verse.on_boot do
+        Verse.event_manager.subscribe(
+          "example:add",
+          mode: Verse::Event::Manager::MODE_COMMAND
+        ) do |message, _channel|
+          message.reply(message.content.sum)
+        end
+      end
+
+      Verse.start(
+        :test,
+        config_path: "./spec/spec_data/config.yml"
+      )
+
+      em2 = Verse::Redis::Stream::EventManager.new(
+        service_name: "verse_spec",
+        service_id: "1234", # random ID
+        config: {},
+        logger: Verse.logger
+      )
+
+      message = em2.request("example:add", [1, 2, 3], timeout: 2000)
+      expect(message.content).to eq(6)
+    end
+  end
+
 end

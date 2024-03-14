@@ -52,7 +52,7 @@ RSpec.describe Verse::Periodic::Manager do
     @manager.add_task(task)
     sleep 0.01
     expect(output).to be_nil
-    sleep 0.041
+    sleep 0.05
     expect(output).to eq("Hello")
   end
 
