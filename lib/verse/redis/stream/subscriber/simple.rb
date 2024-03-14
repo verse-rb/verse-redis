@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "./base"
 require "monitor"
 
@@ -5,8 +7,8 @@ module Verse
   module Redis
     module Stream
       module Subscriber
+        # A simple subscriber using Redis Pub/Sub feature
         class Simple < Base
-
           include MonitorMixin
 
           attr_reader :service_name, :service_id
@@ -25,8 +27,10 @@ module Verse
 
             return if channels.empty?
 
+            @lock_set = channels.to_h
+
             synchronize do
-              @thread = Thread.new{ listen }
+              @thread = Thread.new { listen }
               @thread.name = "Verse Redis EM - Basic Subscriber"
 
               @cond.wait
@@ -38,50 +42,52 @@ module Verse
             @thread&.kill
           end
 
-          def lock(redis, channel, msgid, &block)
-            lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}:#{msgid}"
+          def lock(channel, msgid, &block)
+            redis do |r|
+              lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}:#{msgid}"
 
-            redis.set(lock_key, service_id, nx: true, ex: 600, &block)
+              r.set(lock_key, service_id, nx: true, ex: 600, &block)
+              yield if r.get(lock_key) == service_id
+            end
+          end
 
-            yield if redis.get(lock_key) == service_id
+          def on_subscribe(channel, _)
+            synchronize do
+              Verse.logger.debug { "Subscribed to `#{channel}`" }
+              @cond.signal # Signal that subscription is ready. #start method will stop waiting
+            end
+          end
+
+          def on_message(channel, message)
+            unpacked_message = Message.unpack(@manager, message, channel:)
+
+            has_lock = @lock_set[channel]
+
+            if has_lock
+              lock(channel, unpacked_message.id) do
+                # per service message
+                Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
+                process_message(channel, unpacked_message)
+              end
+            else
+              # broadcasted message
+              Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
+              process_message(channel, unpacked_message)
+            end
           end
 
           def listen
             redis do |r|
-              lock_set = channels.to_h
-              r.subscribe(*lock_set.keys) do |on|
-                on.subscribe do |channel, _|
-                  synchronize do
-                    Verse.logger.debug{ "Subscribed to `#{channel}`" }
-                    @cond.signal # Signal that subscription is ready. #start method will stop waiting
-                  end
-                end
-
-                on.message do |channel, message|
-                  unpacked_message = Message.unpack(@manager, message, channel: channel)
-
-                  has_lock = lock_set[channel]
-
-                  if has_lock
-                    lock(r, channel, unpacked_message.id) do
-                      # per service message
-                      Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
-                      process_message(channel, unpacked_message)
-                    end
-                  else
-                    # broadcasted message
-                    Verse.logger.debug { "Message on `#{channel}` (#{message.size} bytes)" }
-                    process_message(channel, unpacked_message)
-                  end
-                end
+              r.subscribe(*@lock_set.keys) do |on|
+                on.subscribe(&method(:on_subscribe))
+                on.message(&method(:on_message))
               end
             end
-          rescue ::Redis::BaseConnectionError => error
-            Verse.warn{ "#{error}, retrying in 500ms" }
+          rescue ::Redis::BaseConnectionError => e
+            Verse.warn { "#{e}, retrying in 500ms" }
             sleep 0.5
             retry
           end
-
         end
       end
     end

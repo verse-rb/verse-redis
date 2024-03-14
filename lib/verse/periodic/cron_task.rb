@@ -20,7 +20,7 @@ module Verse
           name,
           manager,
           @at,
-          per_service: per_service,
+          per_service:,
           &block
         )
       end

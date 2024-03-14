@@ -9,13 +9,12 @@ module Verse
       # @see Verse::Http::Exposition::Extension#on_http
       # @see Verse::Exposition::Base#expose
       class Hook < Verse::Exposition::Hook::Base
-
         attr_reader :type
 
         # Create a new hook
         # Used internally by the `on_http` method.
         # @see Verse::Http::Exposition::Extension#on_http
-        def initialize(exposition, type, arg)
+        def initialize(exposition, _type, _arg)
           super(exposition)
 
           renderer ||= exposition.renderer
@@ -67,11 +66,11 @@ module Verse
 
               exposition = hook.create_exposition(
                 auth_context,
-                env: env,
+                env:,
                 unsafe_params: params,
                 params: safe_params,
                 renderer: renderer_instance,
-                server: self,
+                server: self
               )
 
               result = exposition.run do

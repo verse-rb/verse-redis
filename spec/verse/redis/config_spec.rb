@@ -1,5 +1,6 @@
-RSpec.describe Verse::Redis::Config do
+# frozen_string_literal: true
 
+RSpec.describe Verse::Redis::Config do
   it "valid and invalid configs" do
     [
       [{
@@ -11,5 +12,4 @@ RSpec.describe Verse::Redis::Config do
       expect(Verse::Redis::Config::Schema.validate(config).success?).to be(valid)
     end
   end
-
 end

@@ -1,13 +1,14 @@
+# frozen_string_literal: true
+
 module Verse
   module Redis
     module Stream
       module Subscriber
         class Base
-
           attr_reader :block, :channels
 
           def initialize(redis:, manager:, &block)
-            @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : -> (&block) { block.call(redis) }
+            @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : ->(&block) { block.call(redis) }
             @manager = manager
             @block = block
             @channels = []
@@ -28,6 +29,7 @@ module Verse
 
           def subscribe(channel, lock: false)
             raise "cannot listen to a channel while the subscriber is running" unless @stopped
+
             @channels << [channel, lock]
           end
 
@@ -35,7 +37,7 @@ module Verse
             @block.call(channel, message)
           end
 
-          alias :<< :subscribe
+          alias << subscribe
         end
       end
     end

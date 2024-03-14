@@ -1,5 +1,6 @@
-class MyExposition < Verse::Exposition::Base
+# frozen_string_literal: true
 
+class MyExposition < Verse::Exposition::Base
   @log = []
 
   class << self
@@ -21,5 +22,4 @@ class MyExposition < Verse::Exposition::Base
     auth_context.mark_as_checked!
     self.class.log << "some_channel_event_fired"
   end
-
 end

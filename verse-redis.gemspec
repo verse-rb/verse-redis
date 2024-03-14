@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Redis Integration into Verse Framework"
   spec.homepage = "https://github.com/verse-rb/verse-redis"
-  spec.required_ruby_version = ">= 3.0.0"
+  spec.required_ruby_version = ">= 3.1.0"
 
   # spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
 
@@ -30,8 +30,8 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Uncomment to register a new dependency of your gem
-  spec.add_dependency "redis", "~> 5"
   spec.add_dependency "parse-cron", "~> 0.1"
+  spec.add_dependency "redis", "~> 5"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html

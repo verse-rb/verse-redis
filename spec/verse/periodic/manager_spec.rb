@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 RSpec.describe Verse::Periodic::Manager do
-
   let(:locker_stub) do
     locker_stub = double("locker")
 
-    allow(locker_stub).to receive(:lock) do |name, at, &block|
+    allow(locker_stub).to receive(:lock) do |_name, _at, &block|
       @lock_called = true
       block.call
     end
@@ -84,6 +83,4 @@ RSpec.describe Verse::Periodic::Manager do
 
     expect(lock_called).to be(true)
   end
-
-
 end

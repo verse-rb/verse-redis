@@ -23,7 +23,7 @@ module Verse
           keyword_init: true
         )
 
-        def initialize(service_name:, service_id:, config: nil, logger:)
+        def initialize(service_name:, service_id:, logger:, config: nil)
           super
 
           @config = validate_config(config)
@@ -82,12 +82,12 @@ module Verse
           stream = ["VERSE:STREAM:RESOURCE", resource_type, shard].join(":")
           simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
 
-          headers = { event: event }.merge(headers)
+          headers = { event: }.merge(headers)
 
           message = Message.new(
             payload,
             manager: self,
-            headers: headers
+            headers:
           )
 
           content = message.pack
@@ -97,7 +97,7 @@ module Verse
 
             redis.xadd(
               stream,
-              {msg: content},
+              { msg: content },
               nomkstream: true,
               approximate: true,
               maxlen: config.maxlen
@@ -110,7 +110,7 @@ module Verse
 
         # Publish an event to a specific channel.
         def publish(channel, content, headers: {}, key: nil, reply_to: nil)
-          message = Message.new(content, manager: self, headers: headers, reply_to: reply_to)
+          message = Message.new(content, manager: self, headers:, reply_to:)
 
           packed_message = message.pack
 
@@ -131,7 +131,7 @@ module Verse
 
             rd.xadd(
               channel,
-              {msg: packed_message},
+              { msg: packed_message },
               approximate: true,
               maxlen: max_len,
               nomkstream: true # Do not create the stream; instead subscribers are creating it on demand.
@@ -153,10 +153,10 @@ module Verse
 
           with_redis do |rd|
             msgpacked =
-              Message.new(self, content, headers: headers, reply_to: reply_to).to_msgpack
+              Message.new(self, content, headers:, reply_to:).to_msgpack
 
             rd.subscribe_with_timeout(reply_to) do |on|
-              on.message do |channel, message|
+              on.message do |_channel, _message|
                 q.push(Message.from(payload))
               end
             end
@@ -181,10 +181,10 @@ module Verse
 
           with_redis do |rd|
             msgpacked =
-              Message.new(self, content, headers: headers, reply_to: reply_to).to_msgpack
+              Message.new(self, content, headers:, reply_to:).to_msgpack
 
             rd.subscribe_with_timeout(reply_to) do |on|
-              on.message do |channel, message|
+              on.message do |_channel, _message|
                 responses << Message.from(payload)
               end
             end
@@ -204,18 +204,19 @@ module Verse
           raise "cannot subscribe when started" unless @stopped
 
           unless Event::Manager::ALL_MODES.include?(mode)
-            raise ArgumentError, "mode must be #{Event::Manager::ALL_MODES.map(&:inspect).join(", ")}, but `#{mode}` given"
+            raise ArgumentError,
+                  "mode must be #{Event::Manager::ALL_MODES.map(&:inspect).join(", ")}, but `#{mode}` given"
           end
 
           @subscriptions << Subscription.new(
-            channel: channel,
-            mode: mode,
-            block: block
+            channel:,
+            mode:,
+            block:
           )
         end
 
         def subscribe_resource_event(resource_type:, event:, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
-          logger.debug{ "subscribe resource event #{resource_type}##{event} in mode #{mode}" }
+          logger.debug { "subscribe resource event #{resource_type}##{event} in mode #{mode}" }
 
           stream_id = \
             case mode
@@ -225,38 +226,34 @@ module Verse
               ["VERSE:RESOURCE:", resource_type, event].join(":")
             end
 
-          logger.debug{ "subscribe on #{stream_id}" }
+          logger.debug { "subscribe on #{stream_id}" }
 
-          callback = ->(message, channel) do
+          callback = lambda do |message, channel|
             block.call(message, channel) if message.headers["event"] == event
           end
 
           @subscriptions << Subscription.new(
             channel: stream_id,
-            mode: mode,
+            mode:,
             block: callback
           )
-
         end
 
         def dispatch_message(channel, message)
-          logger.debug{ "dispatch message #{channel} #{message}" }
+          logger.debug { "dispatch message #{channel} #{message}" }
 
-          @subscriptions.lazy.select{ |sub|
-            if sub.mode == Event::Manager::MODE_CONSUMER
-              channel.start_with?(sub.channel)
-            else
+          filter = lambda { |sub|
+            sub.mode == Event::Manager::MODE_CONSUMER &&
+              channel.start_with?(sub.channel) ||
               sub.channel == channel
-            end
-          }.each do |sub|
+          }
+
+          @subscriptions.lazy.select(&filter).each do |sub|
             sub.block.call(message, channel)
-          rescue => e
-            logger.error{ "Error while processing message on channel #{channel}: #{e.message}" }
-            logger.error{ e.backtrace.join("\n") }
+          rescue StandardError => e
+            logger.error { "Error while processing message on channel #{channel}: #{e.message}" }
+            logger.error { e.backtrace.join("\n") }
           end
-        rescue => e
-          logger.error{ "Error while processing message: #{e.message}" }
-          logger.error{ e.backtrace.join("\n") }
         end
 
         private
@@ -294,7 +291,6 @@ module Verse
             end
           end
         end
-
       end
     end
   end

@@ -24,7 +24,7 @@ module Verse
           name,
           manager,
           planned_time(Time.now.to_f, period),
-          per_service: per_service,
+          per_service:,
           &block
         )
       end

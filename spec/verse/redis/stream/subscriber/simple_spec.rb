@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "verse/redis/stream/subscriber/simple"
 require "redis"
 
@@ -24,14 +26,14 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
   let(:queue) { Queue.new }
 
-  let(:message) { Verse::Redis::Stream::Message.new("This is a message")}
+  let(:message) { Verse::Redis::Stream::Message.new("This is a message") }
 
   subject(:subscriber_a) do
     described_class.new(
       redis: Redis.new,
       manager: nil,
       service_name: "test:service",
-      service_id: "a",
+      service_id: "a"
     ) do |channel, message|
       (@messages[channel] ||= []) << message
       queue << message
@@ -43,7 +45,7 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       redis: Redis.new,
       manager: nil,
       service_name: "test:service",
-      service_id: "b",
+      service_id: "b"
     ) do |channel, message|
       (@messages[channel] ||= []) << message
       queue << message
@@ -67,9 +69,9 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       queue.pop
 
       expect(@messages["test_channel"].map(&:content)).to eq([
-        "This is a message",
-        "This is a message"
-      ])
+                                                               "This is a message",
+                                                               "This is a message"
+                                                             ])
     ensure
       subscriber_a.stop
       subscriber_b.stop
@@ -92,21 +94,20 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
       sleep(0.05)
       expect(queue.size).to eq(0)
       expect(@messages["per_service_message"].map(&:content)).to eq([
-        "yet another message"
-      ])
+                                                                      "yet another message"
+                                                                    ])
     ensure
       subscriber_a.stop
       subscriber_b.stop
     end
 
     it "stress test" do
-
       subs = 10.times.map do |i|
         described_class.new(
           redis: Redis.new,
           manager: nil,
           service_name: "test:service",
-          service_id: "consumer_#{i}",
+          service_id: "consumer_#{i}"
         ) do |channel, message|
           (@messages[channel] ||= []) << message
           queue << message
@@ -120,22 +121,19 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Simple do
 
       sleep(0.05) # Wait for subscriptions to start
 
-      random_set = [ *("A".."Z").to_a, " ", *("0".."9").to_a]
+      random_set = [*("A".."Z").to_a, " ", *("0".."9").to_a]
 
-      100.times do |i|
-        content = 2048.times.map{ random_set.sample }.join
-        redis.publish("stress_test", Verse::Redis::Stream::Message.new(content).pack )
+      100.times do |_i|
+        content = 2048.times.map { random_set.sample }.join
+        redis.publish("stress_test", Verse::Redis::Stream::Message.new(content).pack)
       end
 
-      100.times{ queue.pop }
+      100.times { queue.pop }
 
       expect(@messages["stress_test"].size).to eq(100)
     ensure
       subscriber_a.stop
       subscriber_b.stop
     end
-
   end
-
-
 end

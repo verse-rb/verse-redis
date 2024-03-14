@@ -1,13 +1,15 @@
+# frozen_string_literal: true
+
 require "verse/redis/stream/subscriber/stream"
 require "redis"
 
 RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
-  let(:config) {
+  let(:config) do
     {
       max_block_time: 1,
-      min_block_time: 0.1,
+      min_block_time: 0.1
     }
-  }
+  end
 
   let(:redis) { Redis.new }
   let(:redis_listener) { Redis.new }
@@ -25,7 +27,6 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
     end
   end
 
-
   before do
     redis.flushall
     @messages = {}
@@ -35,11 +36,10 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
 
   subject do
     described_class.new(config,
-      manager: nil,
-      consumer_name: "test_group",
-      consumer_id: "test_id",
-      redis: redis_listener,
-    ) do |channel, message|
+                        manager: nil,
+                        consumer_name: "test_group",
+                        consumer_id: "test_id",
+                        redis: redis_listener) do |channel, message|
       (@messages[channel] ||= []) << message
       queue << message
     end
@@ -49,26 +49,26 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
     it "runs LOCK and UNLOCK SCRIPTS" do
       acquired = subject.acquire_locks(["test_channel"], redis)
       expect(acquired).to eq([
-        "test_channel", 0xffff
-      ])
+                               "test_channel", 0xffff
+                             ])
 
       # all locked
       acquired = subject.acquire_locks(["test_channel"], redis)
       expect(acquired).to eq([
-        "test_channel", 0x0
-      ])
+                               "test_channel", 0x0
+                             ])
 
-      #reset
+      # reset
       redis.flushall
 
-      #create manually a lock
+      # create manually a lock
       redis.set("{VERSE:STREAM:SHARDLOCK}:test_channel:1:test_group", "another_id")
 
-      #try to lock
+      # try to lock
       acquired = subject.acquire_locks(["test_channel"], redis)
       expect(acquired).to eq([
-        "test_channel", (0xffff - 2)
-      ])
+                               "test_channel", (0xffff - 2)
+                             ])
 
       expect(redis.get("{VERSE:STREAM:SHARDLOCK}:test_channel:2:test_group")).to eq("test_id")
 
@@ -81,15 +81,15 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
     end
 
     it "works even if the script has been flushed (e.g. redis restarted)" do
-      acquired = subject.acquire_locks(["test_channel"], redis)
+      subject.acquire_locks(["test_channel"], redis)
 
       redis.script(:flush)
       redis.flushall #  Doesn't matter, we check that it has no error on evalsha
 
       acquired = subject.acquire_locks(["test_channel"], redis)
       expect(acquired).to eq([
-        "test_channel", 0xffff
-      ])
+                               "test_channel", 0xffff
+                             ])
     end
   end
 
@@ -103,13 +103,11 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       sleep 0.1
 
       # Works with no-sharding
-      msg = Verse::Redis::Stream::Message.new({a: 1})
-      redis.xadd("VERSE:STREAM:test_channel", {msg: msg.pack})
+      msg = Verse::Redis::Stream::Message.new({ a: 1 })
+      redis.xadd("VERSE:STREAM:test_channel", { msg: msg.pack })
 
-      message = queue.pop
-      expect(@messages["VERSE:STREAM:test_channel"].map(&:content)).to eq([{"a" => 1}])
+      queue.pop
+      expect(@messages["VERSE:STREAM:test_channel"].map(&:content)).to eq([{ "a" => 1 }])
     end
   end
-
-
 end

@@ -16,7 +16,7 @@ module Verse
       end
 
       def dependencies
-        %i<redis>
+        %i[redis]
       end
 
       def on_init
@@ -26,7 +26,6 @@ module Verse
       def on_stop
         @manager.stop
       end
-
     end
   end
 end

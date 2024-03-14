@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "zlib"
 require "msgpack"
 
@@ -18,13 +20,14 @@ module Verse
           channel: nil,
           consumer_group: nil
         )
-          @id     = id || SecureRandom.random_number(2 << 48).to_s(36)
+          @id = id || SecureRandom.random_number(2 << 48).to_s(36)
 
           @channel = channel
           @consumer_group = consumer_group
 
           super(content, manager:, headers:, reply_to:)
         end
+        # rubocop:enable Metrics/ParameterLists
 
         def pack
           Zlib::Deflate.deflate(
@@ -41,23 +44,19 @@ module Verse
           hash = MessagePack.unpack(Zlib::Inflate.inflate(data))
 
           new(hash["c"],
-            headers: hash["h"],
-            reply_to: hash["r"],
-            id: hash["i"],
-            manager:,
-            channel:,
-            consumer_group:
-          )
+              headers: hash["h"],
+              reply_to: hash["r"],
+              id: hash["i"],
+              manager:,
+              channel:,
+              consumer_group:)
         end
 
         def ack
-          unless @id && @channel && @consumer_group
-            raise "Cannot ack message without id, channel and consumer_group"
-          end
+          raise "Cannot ack message without id, channel and consumer_group" unless @id && @channel && @consumer_group
 
-          manager.with_redis{ |rd| rd.xack(@channel, @consumer_group, @id) }
+          manager.with_redis { |rd| rd.xack(@channel, @consumer_group, @id) }
         end
-
       end
     end
   end

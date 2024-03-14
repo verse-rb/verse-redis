@@ -1,11 +1,17 @@
+# frozen_string_literal: true
+
 require_relative "./base"
 
 module Verse
   module Redis
     module Stream
       module Subscriber
+        # This type of subscriber is in charge of reading messages from
+        # multiple redis streams.
+        #
+        # It uses a sharding mechanism to lock the streams related to a resource
+        # and avoid multiple subscribers to read messages in unordered fashion.
         class Stream < Base
-
           # Configuration for the subscriber
           Config = Struct.new(
             :max_block_time,
@@ -18,10 +24,10 @@ module Verse
           ConfigSchema = Verse::Schema.define do
             field(:max_block_time, Float).default(2.0)
             field(:min_block_time, Float).default(0.1)
-            field(:block_time_delta, Float).default(0.7).rule("must be between 0 and 1") { |x| x > 0 && x <= 1 }
-            field(:max_messages_count, Integer).default(10).rule("must be positive integer") { |x| x > 0 }
+            field(:block_time_delta, Float).default(0.7).rule("must be between 0 and 1") { |x| x.positive? && x <= 1 }
+            field(:max_messages_count, Integer).default(10)
 
-            transform{ |data| Config.new(data) }
+            transform { |data| Config.new(data) }
           end
 
           # atomic lock of shards
@@ -42,9 +48,7 @@ module Verse
           def initialize(config, manager:, consumer_name:, consumer_id:, redis:, shards: 16, &block)
             super(redis:, manager:, &block)
 
-            @sha_scripts = {}
-
-            channels = []
+            @sha_scripts = {}.compare_by_identity
             @shards = shards
 
             @config = validate_config(config)
@@ -53,15 +57,16 @@ module Verse
             @consumer_name = consumer_name
             @consumer_id = consumer_id
           end
+          # rubocop:enable Metrics/ParameterLists
 
           def start
             super
 
             return if channels.empty?
 
-            redis{ |r| init_groups(r, channels) }
+            redis { |r| init_groups(r, channels) }
 
-            @thread = Thread.new{ run }
+            @thread = Thread.new { run }
             @thread.name = "Verse Redis EM - Stream Subscriber"
           end
 
@@ -83,16 +88,16 @@ module Verse
           end
 
           def run_script(script, redis, keys: [], argv: [], retried: false)
-            script_id = @sha_scripts.fetch(script.object_id) {
-              @sha_scripts[script.object_id] = redis.script(:load, script)
-            }
+            script_id = @sha_scripts.fetch(script) do
+              @sha_scripts[script] = redis.script(:load, script)
+            end
 
             begin
-              redis.evalsha(script_id, keys: keys, argv: argv)
+              redis.evalsha(script_id, keys:, argv:)
             rescue ::Redis::CommandError => e
               if !retried && e.message.include?("NOSCRIPT")
-                @sha_scripts.delete(script.object_id)
-                return run_script(script, redis, keys: keys, argv: argv, retried: true)
+                @sha_scripts.delete(script)
+                return run_script(script, redis, keys:, argv:, retried: true)
               end
 
               Verse.logger.error(e)
@@ -124,9 +129,7 @@ module Verse
             output = []
             channel_and_flags.each_slice(2).each do |channel, flag|
               @shards.times do |shard_id|
-                if (flag & (1 << shard_id)) != 0
-                  output << "#{channel}:#{shard_id}"
-                end
+                output << "#{channel}:#{shard_id}" if (flag & (1 << shard_id)) != 0
               end
             end
 
@@ -134,9 +137,9 @@ module Verse
           end
 
           def unlock_channel_shards(redis)
-            chan_flags = channels.map(&:first).map{ |x|
+            chan_flags = channels.map(&:first).map do |x|
               [x, 0xffffffff]
-            }.flatten
+            end.flatten
 
             release_locks(chan_flags, redis)
           end
@@ -172,19 +175,17 @@ module Verse
           end
 
           def init_groups(redis, channels)
-            channels = self.channels.map(&:first).map{  |c|
-              [c, *(@shards.times.map{ |i| "#{c}:#{i}"}) ]
-            }.flatten
+            extended_channels = channels.map(&:first).map do |c|
+              [c, *(@shards.times.map { |i| "#{c}:#{i}" })]
+            end.flatten
 
             # create stream(s), attach group
-            channels.each do |channel|
-              begin
-                redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
-                Verse.logger.info { "create consumer group #{@consumer_name} for #{channel}" }
-              rescue ::Redis::CommandError => e
-                # ignore if BUSYGROUP it means the group already exists
-                raise unless e.message.include?("BUSYGROUP")
-              end
+            extended_channels.each do |channel|
+              redis.xgroup(:create, channel, @consumer_name, "$", mkstream: true)
+              Verse.logger.info { "create consumer group #{@consumer_name} for #{channel}" }
+            rescue ::Redis::CommandError => e
+              # ignore if BUSYGROUP it means the group already exists
+              raise unless e.message.include?("BUSYGROUP")
             end
           end
 
@@ -193,7 +194,7 @@ module Verse
               @consumer_name,
               @consumer_id,
               channels,
-              ['>'] * channels.size,
+              [">"] * channels.size,
               count: @config.max_messages_count,
               block: @block_time * 1_000, # Time to wait for messages
               noack: true # simpler, no pending list, can cause loss of messages sometime.
@@ -203,11 +204,9 @@ module Verse
           rescue ::Redis::CommandError => e
             puts e.message
 
-            if e.message.include?("NOGROUP")
-              {} # return nothing for this loop...
-            else
-              raise
-            end
+            raise unless e.message.include?("NOGROUP")
+
+            {} # return nothing for this loop...
           end
 
           def read_channels(redis, channels)
@@ -230,10 +229,21 @@ module Verse
             output
           end
 
+          def process_messages_from_channel(channel_messages)
+            channel, messages = channel_messages
+            messages.each do |(_, message)|
+              message = Message.unpack(self, message["msg"])
+              process_message(channel, message)
+            rescue StandardError => e
+              # log the error but continue to process messages
+              Verse.logger.error { e }
+            end
+          end
+
           def run
             return if channels.empty?
 
-            while !@stopped
+            until @stopped
               begin
                 # Lock as much shards as we can and get the channel list
                 sharded_channels = redis { |r| lock_channel_shards(r) }
@@ -249,29 +259,20 @@ module Verse
                   redis { |r| unlock_empty_shards(output.keys, r) }
 
                   # process the messages
-                  output.each do |channel, messages|
-                    messages.each do |(_, message)|
-                      begin
-                        message = Message.unpack(self, message["msg"])
-                        process_message(channel, message)
-                      rescue => e
-                        # log the error but continue to process messages
-                        Verse.logger.error{ e }
-                      end
-                    end
-                  end
+                  output.each(&method(:process_messages_from_channel))
                 end
-              rescue => e
+              rescue StandardError => e
                 # log the error but continue the loop
-                Verse.logger.error{ e }
+                Verse.logger.error { e }
               ensure
                 # ensure to unlock all the shards
                 redis { |r| unlock_channel_shards(r) }
               end
             end
           end
-
+          # rubocop:enable Metrics/AbcSize
         end
+        # rubocop:enable Metrics/ClassLength
       end
     end
   end
