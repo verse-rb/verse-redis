@@ -4,6 +4,7 @@ require "monitor"
 require "verse/core"
 
 require_relative "./config"
+require_relative "./exposition/extension"
 
 module Verse
   module Periodic
@@ -21,6 +22,12 @@ module Verse
 
       def on_init
         @manager = Manager.new
+
+        Verse::Periodic::Exposition::Extension.periodic_manager = manager
+
+        Verse::Exposition::ClassMethods.prepend(
+          Verse::Periodic::Exposition::Extension
+        )
       end
 
       def on_stop

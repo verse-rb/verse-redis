@@ -9,7 +9,7 @@ module Verse
         @work = work
         @per_service = per_service
         @cron_rule = CronParser.new(cron)
-        @cron_rule.next(Time.now)
+        @at = @cron_rule.next(Time.now)
 
         after do
           @at = @cron_rule.next(@at + 1)
