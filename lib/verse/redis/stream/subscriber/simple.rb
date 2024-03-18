@@ -42,7 +42,7 @@ module Verse
             @thread&.kill
           end
 
-          def lock(channel, msgid, &block)
+          def lock(channel, msgid)
             redis do |r|
               lock_key = "VERSE:STREAM:SIMPLE:LOCK:#{channel}:#{service_name}:#{msgid}"
 

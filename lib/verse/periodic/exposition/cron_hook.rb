@@ -26,7 +26,6 @@ module Verse
           binding.pry
 
           CronTask.new do
-
           end
         end
       end

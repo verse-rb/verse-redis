@@ -9,7 +9,6 @@ module Verse
       # The extension module for Verse::Http::Exposition::Base
       # @see Verse::Http::Exposition::Base
       module Extension
-
         class << self
           attr_accessor :periodic_manager
         end
@@ -18,7 +17,6 @@ module Verse
           hook = Hook.new(self, :schedule, cron)
           hook.register
         end
-
       end
     end
   end

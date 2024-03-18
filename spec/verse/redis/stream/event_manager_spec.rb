@@ -290,15 +290,11 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       # Received each event twice.
       expect(total_events).to eq(10)
     end
-
-
   end
 
   context "#request and #request_all" do
     it "can request and receive a message" do
-      total_events = 0
-
-      queue = Queue.new
+      Queue.new
 
       Verse.on_boot do
         Verse.event_manager.subscribe(
@@ -394,7 +390,5 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       em_subscribers.each(&:stop)
     end
-
   end
-
 end

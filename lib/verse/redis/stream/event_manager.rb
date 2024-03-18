@@ -163,12 +163,12 @@ module Verse
 
           synchronize do
             thread = Thread.new do
-              synchronize{ } # Stop the thread until the wait block is called below.
+              synchronize{} # Stop the thread until the wait block is called below.
               with_redis do |rd|
                 rd.subscribe_with_timeout(timeout, reply_to) do |on|
                   on.subscribe do
                     synchronize{ cond.signal }
-                  end # notify the main thread that the subscription is ready
+                  end
 
                   on.message do |channel, message|
                     logger.debug { "Received reply message on #{channel}: #{message.size}" }
@@ -211,12 +211,12 @@ module Verse
 
           synchronize do
             thread = Thread.new do
-              synchronize{ } # Stop the thread until the wait block is called below.
+              synchronize{} # Stop the thread until the wait block is called below.
               with_redis do |rd|
                 rd.subscribe_with_timeout(timeout, reply_to) do |on|
                   on.subscribe do
                     synchronize{ cond.signal }
-                  end # notify the main thread that the subscription is ready
+                  end
 
                   on.message do |channel, message|
                     logger.debug { "Received reply message on #{channel}: #{message.size}" }
