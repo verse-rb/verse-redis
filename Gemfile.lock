@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/verse-rb/verse-core.git
-  revision: 3cb7c9a3afb2591cd524c5d0cffa29ca903e41cb
+  revision: 8b6222fd03db945d365dd9f153e1595301bbd1d4
   branch: feature/revamp-event-management-system
   specs:
     verse-core (2.0.0)
