@@ -145,8 +145,8 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
-        @queue.push(message)
         total_events += 1
+        @queue.push(message)
       end
 
       Verse.on_stop do

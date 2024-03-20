@@ -35,7 +35,11 @@ RSpec.describe Verse::Exposition::Base do
       )
     end
 
-    sleep 0.01 # Wait to receive all.
+    Timeout.timeout(5) do
+      until MyExposition.log.size == 10
+        sleep(0.01)
+      end
+    end
 
     expect(MyExposition.log.size).to eq(10)
   end
