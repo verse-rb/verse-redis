@@ -8,15 +8,17 @@ module Verse
       # A hook is a single endpoint on the http server
       # @see Verse::Http::Exposition::Extension#on_http
       # @see Verse::Exposition::Base#expose
-      class Hook < Verse::Exposition::Hook::Base
+      class PeriodicHook < Verse::Exposition::Hook::Base
         attr_reader :type
 
         # Create a new hook
-        # Used internally by the `on_http` method.
+        # Used internally by the `on_schedule` method.
         # @see Verse::Http::Exposition::Extension#on_http
-        def initialize(exposition, cron)
+        def initialize(exposition, manager, cron, per_service:)
           super(exposition)
           @cron = cron
+          @manager = manager
+          @per_service = per_service
         end
 
         # :nodoc:
@@ -25,7 +27,10 @@ module Verse
 
           binding.pry
 
-          CronTask.new do
+          CronTask.new(
+            "todo", @manager, @cron, per_service: @per_service
+          ) do
+            hook.call
           end
         end
       end

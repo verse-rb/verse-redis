@@ -20,7 +20,10 @@ module Verse
         @locker = locker
         @locker ||= RedisLocker.new(
           service_name: Verse.service_name,
-          service_id: Verse.service_id
+          service_id: Verse.service_id,
+          redis: proc do |&block|
+            Verse::Plugin[:redis].with_client(&block)
+          end
         )
         @task_list = []
         @cond = new_cond

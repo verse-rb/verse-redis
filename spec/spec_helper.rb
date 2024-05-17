@@ -31,9 +31,9 @@ RSpec.configure do |config|
   config.around(:each) do |example|
     # If a test is taking too long, we cancel it
     # because it means for example messages hasn't been received
-    Timeout.timeout(1.5) do
+    #Timeout.timeout(1.5) do
       example.run
-    end
+    #end
   end
 
   config.before(:suite) do

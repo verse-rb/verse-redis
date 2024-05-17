@@ -3,9 +3,7 @@
 require_relative "redis/version"
 require_relative "redis/plugin"
 
-require_relative "periodic/executioner"
-require_relative "periodic/manager"
-require_relative "periodic/task"
+require_relative "periodic/plugin"
 
 require_relative "redis/stream/event_manager"
 
