@@ -14,6 +14,8 @@ module Verse
         @expire = expire
         @redis_block = redis.is_a?(Method) || redis.is_a?(Proc) ? redis : ->(&block) { block.call(redis) }
 
+        puts "USE OF REDIS BLOCK #{@redis_block}"
+
         @service_name = service_name
         @service_id = service_id
       end

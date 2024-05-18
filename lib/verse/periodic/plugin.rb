@@ -15,9 +15,11 @@ module Verse
     class Plugin < Verse::Plugin::Base
       attr_reader :config
 
+      # :nocov:
       def description
-        "Periodic hooks for Verse. Use of redis for locking mechanism."
+        "Periodic hooks for Verse. Cron and interval based hooks."
       end
+      # :nocov:
 
       def dependencies
         %i[redis]

@@ -15,9 +15,11 @@ module Verse
 
       include MonitorMixin
 
+      # :nocov:
       def description
-        "Redis integration to Verse"
+        "A Redis implementation of Verse's Event Manager"
       end
+      # :nocov:
 
       def on_init
         begin

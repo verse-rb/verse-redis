@@ -14,17 +14,10 @@ module Verse
 
       include MonitorMixin
 
-      def initialize(locker = nil)
+      def initialize(locker)
         self.name = "Verse::Periodic - Scheduler"
 
         @locker = locker
-        @locker ||= RedisLocker.new(
-          service_name: Verse.service_name,
-          service_id: Verse.service_id,
-          redis: proc do |&block|
-            Verse::Plugin[:redis].with_client(&block)
-          end
-        )
         @task_list = []
         @cond = new_cond
         @executioner = Executioner.new
