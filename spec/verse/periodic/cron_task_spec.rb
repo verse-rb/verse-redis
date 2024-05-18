@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 RSpec.describe Verse::Periodic::CronTask do
   subject do
     Verse::Periodic::CronTask.new(
@@ -32,6 +34,5 @@ RSpec.describe Verse::Periodic::CronTask do
       expect(subject.call).to eq("block called")
       expect(@lock_called).to eq(true)
     end
-
   end
 end

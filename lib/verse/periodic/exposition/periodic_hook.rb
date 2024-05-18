@@ -3,7 +3,7 @@
 require_relative "../every_task"
 
 module Verse
-  module Http
+  module Periodic
     module Exposition
       # Define a hook on cron schedule event
       # @see Verse::Periodic::Exposition::Extension#on_every
@@ -35,12 +35,22 @@ module Verse
             method.original_name
           ].join(":")
 
-
-          EveryTask.new(
-            task_name, @manager, @cron, per_service: @per_service
+          task = EveryTask.new(
+            task_name, @manager, @interval, per_service: @per_service
           ) do
-            hook.call
+            context = Verse::Auth::Context[:system]
+            context.mark_as_checked!
+
+            exposition = hook.create_exposition(
+              context, schedule: task
+            )
+
+            exposition.run do
+              hook.method.bind(exposition).call
+            end
           end
+
+          Verse.on_boot { manager.add_task(task) }
         end
       end
     end

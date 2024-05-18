@@ -21,7 +21,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic",
+        Verse.event_manager.subscribe(topic: "example:topic",
                                       mode: Verse::Event::Manager::MODE_CONSUMER) do |message, _channel|
           @queue.push(message)
           total_events += 1
@@ -40,7 +40,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_CONSUMER) do |message, _channel|
+      em2.subscribe(topic: "example:topic", mode: Verse::Event::Manager::MODE_CONSUMER) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
         total_events += 1
@@ -73,7 +73,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic",
+        Verse.event_manager.subscribe(topic: "example:topic",
                                       mode: Verse::Event::Manager::MODE_BROADCAST) do |message, _channel|
           @queue.push(message)
           total_events += 1
@@ -92,7 +92,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_BROADCAST) do |message, _channel|
+      em2.subscribe(topic: "example:topic", mode: Verse::Event::Manager::MODE_BROADCAST) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
         total_events += 1
@@ -125,7 +125,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         # Creating the real event manager
-        Verse.event_manager.subscribe("example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, _channel|
+        Verse.event_manager.subscribe(topic: "example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, _channel|
           @queue.push(message)
           total_events += 1
         end
@@ -143,7 +143,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         logger: Verse.logger
       )
 
-      em2.subscribe("example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, _channel|
+      em2.subscribe(topic: "example:topic", mode: Verse::Event::Manager::MODE_COMMAND) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
         total_events += 1
         @queue.push(message)
@@ -298,7 +298,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       Verse.on_boot do
         Verse.event_manager.subscribe(
-          "example:add",
+          topic: "example:add",
           mode: Verse::Event::Manager::MODE_COMMAND
         ) do |message, _channel|
           message.reply(message.content.sum)
@@ -336,7 +336,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         )
 
         em.subscribe(
-          "example:random_number",
+          topic: "example:random_number",
           mode: Verse::Event::Manager::MODE_COMMAND
         ) do |message, _channel|
           message.reply(rand(100))
@@ -371,7 +371,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
         )
 
         em.subscribe(
-          "example:random_number",
+          topic: "example:random_number",
           mode: Verse::Event::Manager::MODE_BROADCAST
         ) do |message, _channel|
           message.reply(rand(100))

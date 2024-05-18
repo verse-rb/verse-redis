@@ -7,7 +7,7 @@ RSpec.describe Verse::Periodic::RedisLocker do
     Redis.new.flushall
   end
 
-  subject(:locker_1) do
+  subject(:locker1) do
     Verse::Periodic::RedisLocker.new(
       service_name: "verse_spec",
       service_id: "1", # random ID
@@ -15,7 +15,7 @@ RSpec.describe Verse::Periodic::RedisLocker do
     )
   end
 
-  subject(:locker_2) do
+  subject(:locker2) do
     Verse::Periodic::RedisLocker.new(
       service_name: "verse_spec",
       service_id: "2", # random ID
@@ -27,7 +27,7 @@ RSpec.describe Verse::Periodic::RedisLocker do
     it "can lock and unlock a key" do
       lock_acquired = false
 
-      locker_1.lock("test", 4321) do
+      locker1.lock("test", 4321) do
         lock_acquired = true
       end
 
@@ -37,8 +37,8 @@ RSpec.describe Verse::Periodic::RedisLocker do
     it "can't lock a key if it's already locked" do
       lock_acquired = false
 
-      locker_1.lock("test", 4321) do
-        locker_2.lock("test", 4321) do
+      locker1.lock("test", 4321) do
+        locker2.lock("test", 4321) do
           lock_acquired = true
         end
       end

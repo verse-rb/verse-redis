@@ -35,12 +35,24 @@ module Verse
             method.original_name
           ].join(":")
 
-          CronTask.new(
+          task = CronTask.new(
             task_name, @manager, @cron, per_service: @per_service
           ) do
-            binding.pry
-            hook.call
+            context = Verse::Auth::Context[:system]
+            context.mark_as_checked!
+
+            exposition = hook.create_exposition(
+              context, schedule: task
+            )
+
+            exposition.run do
+              hook.method.bind(exposition).call
+            end
           end
+
+          Verse.on_boot {
+            manager.add_task(task)
+          }
         end
       end
     end

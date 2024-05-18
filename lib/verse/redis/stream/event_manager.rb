@@ -170,8 +170,8 @@ module Verse
                     synchronize{ cond.signal }
                   end
 
-                  on.message do |channel, message|
-                    logger.debug { "Received reply message on #{channel}: #{message.size}" }
+                  on.message do |chan, message|
+                    logger.debug { "Received reply message on #{chan}: #{message.size}" }
                     q.push(Message.unpack(self, message))
                   end
                 end
@@ -218,8 +218,8 @@ module Verse
                     synchronize{ cond.signal }
                   end
 
-                  on.message do |channel, message|
-                    logger.debug { "Received reply message on #{channel}: #{message.size}" }
+                  on.message do |chan, message|
+                    logger.debug { "Received reply message on #{chan}: #{message.size}" }
                     synchronize{ output << Message.unpack(self, message) }
                   end
                 end
@@ -243,7 +243,7 @@ module Verse
         # @param channel [String] The channel to subscribe to
         # @param mode [Symbol] The mode of the subscription
         # @param block [Proc] The block to execute when a message is received
-        def subscribe(channel, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
+        def subscribe(topic:, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
           raise "cannot subscribe when started" unless @stopped
 
           unless Event::Manager::ALL_MODES.include?(mode)
@@ -252,7 +252,7 @@ module Verse
           end
 
           @subscriptions << Subscription.new(
-            channel:,
+            channel: topic,
             mode:,
             block:
           )

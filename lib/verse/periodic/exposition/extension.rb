@@ -2,6 +2,7 @@
 
 require_relative "./periodic_hook"
 require_relative "./schedule_hook"
+require_relative "./one_time_hook"
 
 module Verse
   module Periodic

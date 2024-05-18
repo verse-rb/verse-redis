@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 RSpec.describe Verse::Periodic::Task do
   let(:manager) do
     manager = double("manager")
 
-    allow(manager).to receive(:lock) do |name, at, &block|
+    allow(manager).to receive(:lock) do |_name, _at, &block|
       @lock_called = true
       block.call
     end
@@ -17,7 +19,7 @@ RSpec.describe Verse::Periodic::Task do
         manager, # fake data
         1234,
         per_service: true,
-      ) { }
+      ) {}
 
       expect(task.name).to eq("task_name")
       expect(task.manager).to eq(manager)
