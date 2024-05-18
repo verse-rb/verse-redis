@@ -16,11 +16,14 @@ RSpec.describe Verse::Exposition::Base do
       PeriodicExposition.register
     }
 
-    puts "START?"
-
     Verse.start(
       :test,
       config_path: "./spec/spec_data/config_periodic.yml"
+    )
+
+    events = 3.times.map{ PeriodicExposition.queue.pop }
+    expect(events.sort).to eq(
+      %i[call_on_cron call_on_every call_one_time]
     )
 
   end
