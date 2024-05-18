@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
-require 'fugit'
+require "fugit"
 
 module Verse
   module Periodic
     # CronTask is a task that runs at a specific time, specified by a cron
     # expression.
     class CronTask < Task
-
       def per_service?
         @per_service
       end
