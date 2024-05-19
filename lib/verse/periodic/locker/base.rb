@@ -6,7 +6,6 @@ module Verse
       # RedisLocker is a Verse::Periodic::Locker implementation that uses Redis
       # to coordinate task execution.
       class Base
-
         attr_reader :service_name, :service_id
 
         # Initialize the locker

@@ -7,7 +7,7 @@ module Verse
       # to coordinate task execution.
       class None < Base
         # Lock the task and run the block if the lock is acquired.
-        def lock(name, at, &block)
+        def lock(*)
           yield
         end
       end
