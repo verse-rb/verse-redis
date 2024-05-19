@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "./redis_locker"
+require_relative "./locker/base"
 
 module Verse
   module Periodic

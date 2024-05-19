@@ -2,23 +2,25 @@
 
 require "redis"
 
-RSpec.describe Verse::Periodic::RedisLocker do
+RSpec.describe Verse::Periodic::Locker::Redis do
   before do
     Redis.new.flushall
   end
 
   subject(:locker1) do
-    Verse::Periodic::RedisLocker.new(
+    Verse::Periodic::Locker::Redis.new(
       service_name: "verse_spec",
       service_id: "1", # random ID
+      key: "VERSE:PERIODIC:LOCK:%<service_name>s:%<key>s:%<at>s",
       redis: Redis.new
     )
   end
 
   subject(:locker2) do
-    Verse::Periodic::RedisLocker.new(
+    Verse::Periodic::Locker::Redis.new(
       service_name: "verse_spec",
       service_id: "2", # random ID
+      key: "VERSE:PERIODIC:LOCK:%<service_name>s:%<key>s:%<at>s",
       redis: Redis.new
     )
   end
