@@ -3,7 +3,10 @@
 require "monitor"
 require "verse/core"
 
-require_relative "./config"
+require_relative "./executioner"
+require_relative "./manager"
+require_relative "./task"
+
 require_relative "./exposition/extension"
 
 module Verse
@@ -12,21 +15,29 @@ module Verse
     class Plugin < Verse::Plugin::Base
       attr_reader :config
 
+      # :nocov:
       def description
-        "Periodic hooks for Verse. Use of redis for locking mechanism."
+        "Periodic hooks for Verse. Cron and interval based hooks."
       end
+      # :nocov:
 
       def dependencies
         %i[redis]
       end
 
       def on_init
-        @manager = Manager.new
+        @manager = Manager.new(
+          RedisLocker.new(
+            service_name: Verse.service_name,
+            service_id: Verse.service_id,
+            redis: redis.method(:with_client)
+          )
+        )
 
-        Verse::Periodic::Exposition::Extension.periodic_manager = manager
+        Exposition::Extension.periodic_manager = @manager
 
         Verse::Exposition::ClassMethods.prepend(
-          Verse::Periodic::Exposition::Extension
+          Exposition::Extension
         )
       end
 

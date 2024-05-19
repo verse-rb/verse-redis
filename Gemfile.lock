@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/verse-rb/verse-core.git
-  revision: e5c349cd97dbaaf02d6adf5196161cc8a2ed1de9
+  revision: 89e7a056253a4541de064a6272b4ebeef2f19f6a
   branch: master
   specs:
     verse-core (2.0.0)
@@ -10,7 +10,7 @@ GIT
 
 GIT
   remote: https://github.com/verse-rb/verse-schema.git
-  revision: f573aa4f79cd3416d3cae28bb55f0f2ab017c39b
+  revision: 86c37917b6b1bc9eb5c337cbd2e0eab3476f505a
   branch: master
   specs:
     verse-schema (0.1.0)
@@ -19,7 +19,7 @@ PATH
   remote: .
   specs:
     verse-redis (0.1.0)
-      parse-cron (~> 0.1)
+      fugit (~> 1.11)
       redis (~> 5)
 
 GEM
@@ -33,6 +33,11 @@ GEM
     connection_pool (2.4.1)
     diff-lcs (1.5.0)
     docile (1.4.0)
+    et-orbi (1.2.11)
+      tzinfo
+    fugit (1.11.0)
+      et-orbi (~> 1, >= 1.2.11)
+      raabro (~> 1.4)
     i18n (1.10.0)
       concurrent-ruby (~> 1.0)
     json (2.7.1)
@@ -40,13 +45,13 @@ GEM
     method_source (1.0.0)
     msgpack (1.7.2)
     parallel (1.24.0)
-    parse-cron (0.1.4)
     parser (3.3.0.5)
       ast (~> 2.4.1)
       racc
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
+    raabro (1.4.0)
     racc (1.7.3)
     rainbow (3.1.1)
     rake (13.1.0)
@@ -91,6 +96,8 @@ GEM
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
     thor (1.2.2)
+    tzinfo (2.0.6)
+      concurrent-ruby (~> 1.0)
     unicode-display_width (2.5.0)
     yard (0.9.34)
 

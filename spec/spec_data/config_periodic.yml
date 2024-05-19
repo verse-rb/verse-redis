@@ -14,3 +14,4 @@ plugins:
   - name: redis
     config:
       max_connections: 20
+  - name: periodic

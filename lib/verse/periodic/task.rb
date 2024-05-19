@@ -8,6 +8,10 @@ module Verse
     class Task
       attr_reader :name, :manager, :at, :block
 
+      def per_service?
+        @per_service
+      end
+
       def initialize(name, manager, at, per_service: false, &block)
         @name = name
         @manager = manager
