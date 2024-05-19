@@ -15,3 +15,5 @@ plugins:
     config:
       max_connections: 20
   - name: periodic
+    config:
+      locker_class: Verse::Periodic::Locker::Redis
