@@ -8,7 +8,6 @@ module Verse
     # if you create a task with a period of 60 seconds, it will run
     # at the start of every minute (not in a minute from now).
     class EveryTask < Task
-
       attr_reader :period
 
       def per_service?
