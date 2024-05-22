@@ -24,6 +24,8 @@ module Verse
       def on_init
         begin
           require "redis"
+          require "msgpack"
+          require_relative "./ext"
         rescue LoadError
           Verse.logger.error "Please add `redis` to your Gemfile!"
           raise
@@ -34,6 +36,14 @@ module Verse
         @connection_list = []
         @connection_count = 0
         @config = validate_config
+
+        # Register the Time type for MessagePack
+        MessagePack::DefaultFactory.register_type(
+          MessagePack::Timestamp::TYPE, # or just -1
+          Time,
+          packer: MessagePack::Time::Packer,
+          unpacker: MessagePack::Time::Unpacker
+        )
       end
 
       def with_client(&block)
