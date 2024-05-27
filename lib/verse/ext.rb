@@ -18,3 +18,10 @@ MessagePack::DefaultFactory.register_type(
   packer: MessagePack::Time::Packer,
   unpacker: MessagePack::Time::Unpacker
 )
+
+MessagePack::DefaultFactory.register_type(
+  0x50,
+  Date,
+  packer: proc { |date| date.to_time.to_i.to_msgpack },
+  unpacker: proc { |time| Time.at(MessagePack.unpack(time)).to_date }
+)
