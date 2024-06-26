@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../../lib/verse/ext"
 
 RSpec.describe "Extensions" do
@@ -15,5 +17,4 @@ RSpec.describe "Extensions" do
     date = Date.today
     expect(MessagePack.unpack(MessagePack.pack(date))).to eq(date)
   end
-
 end

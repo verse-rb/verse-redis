@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-
 class BigDecimal
   # :nodoc:
   # Monkey patching for serialization purposes.
