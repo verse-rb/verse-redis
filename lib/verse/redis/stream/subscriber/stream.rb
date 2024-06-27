@@ -129,7 +129,7 @@ module Verse
             output = []
             channel_and_flags.each_slice(2).each do |channel, flag|
               @shards.times do |shard_id|
-                output << "#{channel}:#{shard_id}" if (flag & (1 << shard_id)) != 0
+                output << "#{channel}$#{shard_id}" if (flag & (1 << shard_id)) != 0
               end
             end
 
@@ -176,7 +176,7 @@ module Verse
 
           def init_groups(redis, channels)
             extended_channels = channels.map(&:first).map do |c|
-              [c, *(@shards.times.map { |i| "#{c}:#{i}" })]
+              [c, *(@shards.times.map { |i| "#{c}$#{i}" })]
             end.flatten
 
             # create stream(s), attach group
@@ -229,8 +229,17 @@ module Verse
 
           def process_messages_from_channel(channel_messages)
             channel, messages = channel_messages
-            messages.each do |(_, message)|
-              message = Message.unpack(self, message["msg"])
+
+            # Remove the shard id from the channel name
+            channel = channel.split(/$([^$]+)$/).first
+
+            messages.each do |_, message|
+              message = Message.unpack(
+                self,
+                message["msg"],
+                channel:,
+                consumer_group: @consumer_name
+              )
               process_message(channel, message)
             rescue StandardError => e
               # log the error but continue to process messages

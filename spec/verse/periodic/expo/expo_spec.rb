@@ -8,8 +8,6 @@ RSpec.describe Verse::Exposition::Base do
     now = Time.new(2021, 1, 1, 0, 4, 59.9)
     now_after = now + 1 # one second later.
 
-    puts "NOW = #{now.to_f}"
-
     allow(Time).to receive(:now).and_return(now)
 
     ::Redis.new.flushall

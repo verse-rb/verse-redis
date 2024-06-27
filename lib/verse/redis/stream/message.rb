@@ -43,14 +43,14 @@ module Verse
         def self.unpack(manager, data, channel: nil, consumer_group: nil)
           hash = MessagePack.unpack(
             Zlib::Inflate.inflate(data),
-            symbolize_names: true
+            symbolize_keys: true
           )
 
           new(
-            hash["c"],
-            headers: hash["h"],
-            reply_to: hash["r"],
-            id: hash["i"],
+            hash[:c],
+            headers: hash[:h],
+            reply_to: hash[:r],
+            id: hash[:i],
             manager:,
             channel:,
             consumer_group:

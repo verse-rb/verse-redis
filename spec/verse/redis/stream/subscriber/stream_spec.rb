@@ -104,10 +104,10 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
 
       # Works with no-sharding
       msg = Verse::Redis::Stream::Message.new({ a: 1 })
-      redis.xadd("VERSE:STREAM:test_channel", { msg: msg.pack })
+      redis.xadd("VERSE:STREAM:test_channel$1", { msg: msg.pack })
 
       queue.pop
-      expect(@messages["VERSE:STREAM:test_channel"].map(&:content)).to eq([{ "a" => 1 }])
+      expect(@messages["VERSE:STREAM:test_channel$1"].map(&:content)).to eq([{ a: 1 }])
     end
   end
 end

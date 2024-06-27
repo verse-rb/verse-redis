@@ -28,7 +28,11 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 
-  config.around(:each, &:run)
+  config.around(:each) do |example|
+    Timeout.timeout(5) do
+      example.run
+    end
+  end
 
   config.before(:suite) do
     # For tests without Verse initialized

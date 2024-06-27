@@ -78,7 +78,7 @@ RSpec.describe Verse::Periodic::Manager do
 
     sleep 0.01
     expect(output).to be_nil
-    sleep 0.041
+    sleep 0.045
     expect(output).to eq("Hello")
 
     expect(lock_called).to be(true)

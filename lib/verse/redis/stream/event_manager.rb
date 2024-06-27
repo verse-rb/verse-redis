@@ -82,7 +82,7 @@ module Verse
         def publish_resource_event(resource_type:, resource_id:, event:, payload:, headers: {})
           shard = find_partition(resource_id)
 
-          stream = ["VERSE:STREAM:RESOURCE", resource_type, shard].join(":")
+          stream = ["VERSE:STREAM:RESOURCE", [resource_type, shard].join("$")].join(":")
           simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
 
           headers = { event: }.merge(headers)
@@ -131,7 +131,7 @@ module Verse
             stream_config = @config.streams[channel.to_sym]
             max_len = stream_config&.maxlen || @config.maxlen
 
-            channel = [channel, partition].compact.join(":")
+            channel = [channel, partition].compact.join("$")
 
             rd.xadd(
               channel,
@@ -272,7 +272,8 @@ module Verse
           logger.debug { "subscribe on #{stream_id}" }
 
           callback = lambda do |message, channel|
-            block.call(message, channel) if message.headers["event"] == event
+            next if message.headers[:event] != event
+            block.call(message, channel)
           end
 
           @subscriptions << Subscription.new(
