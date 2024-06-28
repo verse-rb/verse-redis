@@ -66,16 +66,35 @@ module Verse
 
             redis { |r| init_groups(r, channels) }
 
-            @thread = Thread.new { run }
-            @thread.name = "Verse Redis EM - Stream Subscriber"
+            @stream_thread = Thread.new { run }
+            @stream_thread.name = "Verse Redis EM - Stream Subscriber"
+
+            @liveness_thread = Thread.new { liveness_run }
+            @liveness_thread.name = "Verse Redis EM - Stream Subscriber Liveness"
           end
 
           def stop
             super
-            @thread&.join
+            @stream_thread&.join
           end
 
           protected
+
+          def liveness_run
+            key = "{VERSE:STREAM:SHARDLOCK}:SERVICE_LIVENESS:#{@consumer_id}"
+
+            until @stopped
+              redis do |r|
+                r.set(key, 1, ex: 30)
+              end
+
+              sleep 15
+            end
+          rescue StandardError => e
+            # Redis error? Log it and continue
+            Verse.logger.error(e)
+            retry
+          end
 
           def validate_config(config)
             return config if config.is_a?(Config)
@@ -233,7 +252,7 @@ module Verse
             # Remove the shard id from the channel name
             channel = channel.split(/$([^$]+)$/).first
 
-            messages.each do |_, message|
+            messages.each do |(_, message)|
               message = Message.unpack(
                 self,
                 message["msg"],

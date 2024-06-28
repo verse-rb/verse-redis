@@ -35,11 +35,13 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
   let(:queue) { Queue.new }
 
   subject do
-    described_class.new(config,
-                        manager: nil,
-                        consumer_name: "test_group",
-                        consumer_id: "test_id",
-                        redis: redis_listener) do |channel, message|
+    described_class.new(
+      config,
+      manager: nil,
+      consumer_name: "test_group",
+      consumer_id: "test_id",
+      redis: redis_listener
+    ) do |channel, message|
       (@messages[channel] ||= []) << message
       queue << message
     end
@@ -47,16 +49,21 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
 
   context "#run_script" do
     it "runs LOCK and UNLOCK SCRIPTS" do
+      redis.set("{VERSE:STREAM:SHARDLOCK}:SERVICE_LIVENESS:test_id", 1, ex: 30)
       acquired = subject.acquire_locks(["test_channel"], redis)
-      expect(acquired).to eq([
-                               "test_channel", 0xffff
-                             ])
+      expect(acquired).to eq(
+        [
+          "test_channel", 0xffff
+        ]
+      )
 
       # all locked
       acquired = subject.acquire_locks(["test_channel"], redis)
-      expect(acquired).to eq([
-                               "test_channel", 0x0
-                             ])
+      expect(acquired).to eq(
+        [
+          "test_channel", 0x0
+        ]
+      )
 
       # reset
       redis.flushall
@@ -64,11 +71,16 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       # create manually a lock
       redis.set("{VERSE:STREAM:SHARDLOCK}:test_channel:1:test_group", "another_id")
 
+      # tell that the other service is alive:
+      redis.set("{VERSE:STREAM:SHARDLOCK}:SERVICE_LIVENESS:another_id", 1, ex: 30)
+
       # try to lock
       acquired = subject.acquire_locks(["test_channel"], redis)
-      expect(acquired).to eq([
-                               "test_channel", (0xffff - 2)
-                             ])
+      expect(acquired).to eq(
+        [
+          "test_channel", (0xffff - 2)
+        ]
+      )
 
       expect(redis.get("{VERSE:STREAM:SHARDLOCK}:test_channel:2:test_group")).to eq("test_id")
 
@@ -87,9 +99,11 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       redis.flushall #  Doesn't matter, we check that it has no error on evalsha
 
       acquired = subject.acquire_locks(["test_channel"], redis)
-      expect(acquired).to eq([
-                               "test_channel", 0xffff
-                             ])
+      expect(acquired).to eq(
+        [
+          "test_channel", 0xffff
+        ]
+      )
     end
   end
 

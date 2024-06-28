@@ -273,6 +273,7 @@ module Verse
 
           callback = lambda do |message, channel|
             next if message.headers[:event] != event
+
             block.call(message, channel)
           end
 
