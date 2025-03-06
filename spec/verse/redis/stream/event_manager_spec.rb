@@ -173,6 +173,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
     it "can publish and receive resource event (mode CONSUMER)" do
       total_events = 0
+      received_channels = []
 
       Verse.on_boot do
         # Creating the real event manager
@@ -181,6 +182,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
           event: "topic"
         ) do |message, _channel|
           @queue.push(message)
+          received_channels << message.channel
           total_events += 1
         end
       end
@@ -203,6 +205,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       ) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
+        received_channels << message.channel
         total_events += 1
       end
 
@@ -228,10 +231,16 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       # Received each event only once.
       expect(total_events).to eq(5)
+
+      # Verify that the channel is the business channel name
+      received_channels.each do |channel|
+        expect(channel).to eq("example")
+      end
     end
 
     it "can publish and receive resource event (mode BROADCAST)" do
       total_events = 0
+      received_channels = []
 
       Verse.on_boot do
         # Creating the real event manager
@@ -241,6 +250,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
           mode: Verse::Event::Manager::MODE_BROADCAST
         ) do |message, _channel|
           @queue.push(message)
+          received_channels << message.channel
           total_events += 1
         end
       end
@@ -264,6 +274,7 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       ) do |message, _channel|
         # Creating another one to deal with concurrency with consumers
         @queue.push(message)
+        received_channels << message.channel
         total_events += 1
       end
 
@@ -289,6 +300,11 @@ RSpec.describe Verse::Redis::Stream::EventManager do
 
       # Received each event twice.
       expect(total_events).to eq(10)
+
+      # Verify that the channel is the business channel name
+      received_channels.each do |channel|
+        expect(channel).to eq("example:topic")
+      end
     end
   end
 

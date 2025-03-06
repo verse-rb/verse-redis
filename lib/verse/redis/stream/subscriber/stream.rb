@@ -45,7 +45,16 @@ module Verse
           # @param redis_block [Proc] The block to execute to get a redis connection
           # @param shards [Integer] The number of shards to use
           # @param block [Proc] The block to execute when a message is received
-          def initialize(config, manager:, consumer_name:, consumer_id:, redis:, shards: 16, &block)
+          def initialize(
+            config,
+            manager:,
+            consumer_name:,
+            consumer_id:,
+            redis:,
+            prefix: "", # prefix to remove
+            shards: 16,
+            &block
+          )
             super(redis:, manager:, &block)
 
             @sha_scripts = {}.compare_by_identity
@@ -56,6 +65,8 @@ module Verse
 
             @consumer_name = consumer_name
             @consumer_id = consumer_id
+
+            @prefix = prefix
           end
           # rubocop:enable Metrics/ParameterLists
 
@@ -249,14 +260,20 @@ module Verse
           def process_messages_from_channel(channel_messages)
             channel, messages = channel_messages
 
+            business_channel = channel
+
+            if @prefix
+              business_channel = channel.sub(@prefix, "")
+            end
+
             # Remove the shard id from the channel name
-            channel = channel.split(/$([^$]+)$/).first
+            business_channel = business_channel.split(/\$([^$]+)$/).first
 
             messages.each do |(_, message)|
               message = Message.unpack(
                 self,
                 message["msg"],
-                channel:,
+                channel: business_channel,
                 consumer_group: @consumer_name
               )
               process_message(channel, message)

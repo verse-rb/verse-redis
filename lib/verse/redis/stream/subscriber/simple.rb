@@ -13,11 +13,20 @@ module Verse
 
           attr_reader :service_name, :service_id
 
-          def initialize(redis:, manager:, service_name:, service_id:, &block)
+          def initialize(
+            redis:,
+            manager:,
+            service_name:,
+            service_id:,
+            prefix: nil,
+            &block
+          )
             super(redis:, manager:, &block)
 
             @service_name = service_name
             @service_id = service_id
+
+            @prefix = prefix
 
             @cond = new_cond
           end
@@ -59,7 +68,13 @@ module Verse
           end
 
           def on_message(channel, message)
-            unpacked_message = Message.unpack(@manager, message, channel:)
+            business_channel = channel
+
+            if @prefix
+              business_channel = channel.sub(@prefix, "")
+            end
+
+            unpacked_message = Message.unpack(@manager, message, channel: business_channel)
 
             has_lock = @lock_set[channel]
 

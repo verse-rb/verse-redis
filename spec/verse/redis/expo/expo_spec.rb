@@ -24,6 +24,7 @@ RSpec.describe Verse::Exposition::Base do
 
   it "can register and fire resource events" do
     expect(MyExposition.log.empty?).to be true
+    expect(MyExposition.channels).to be_empty
 
     10.times do |x|
       Verse.publish_resource_event(
@@ -42,5 +43,8 @@ RSpec.describe Verse::Exposition::Base do
     end
 
     expect(MyExposition.log.size).to eq(10)
+
+    # Verify that the channel is the business channel name
+    expect(MyExposition.channels.uniq).to eq(["resource_type"])
   end
 end

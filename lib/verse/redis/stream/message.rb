@@ -9,7 +9,7 @@ module Verse
       # A naive implementation of a message for Redis Streams
       # using msgpack and zlib to compress the message.
       class Message < Verse::Event::Message
-        attr_reader :id, :channel, :consumer_group
+        attr_reader :id, :channel, :consumer_group, :redis_channel
 
         def initialize(
           content,

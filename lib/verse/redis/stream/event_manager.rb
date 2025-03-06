@@ -39,6 +39,7 @@ module Verse
             manager: self,
             service_name:,
             service_id:,
+            prefix: "VERSE:RESOURCE:",
             &method(:dispatch_message)
           )
 
@@ -48,6 +49,7 @@ module Verse
             consumer_name: service_name,
             consumer_id: service_id,
             shards: @config.partitions,
+            prefix: "VERSE:STREAM:RESOURCE:",
             redis: method(:with_redis),
             &method(:dispatch_message)
           )
@@ -83,7 +85,7 @@ module Verse
           shard = find_partition(resource_id)
 
           stream = ["VERSE:STREAM:RESOURCE", [resource_type, shard].join("$")].join(":")
-          simple_channel = ["VERSE:RESOURCE:", resource_type, event].join(":")
+          simple_channel = ["VERSE:RESOURCE", resource_type, event].join(":")
 
           headers = { event: }.merge(headers)
 
@@ -266,7 +268,7 @@ module Verse
             when Event::Manager::MODE_CONSUMER
               ["VERSE:STREAM:RESOURCE", resource_type].join(":")
             else
-              ["VERSE:RESOURCE:", resource_type, event].join(":")
+              ["VERSE:RESOURCE", resource_type, event].join(":")
             end
 
           logger.debug { "subscribe on #{stream_id}" }

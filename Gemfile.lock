@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/verse-rb/verse-core.git
-  revision: 6b7edcfb614fdbeb5865daa6373dbbe5fa3e579d
+  revision: a8107aef7df9e1af2cfbe39b69825a99ae2ef9e6
   branch: master
   specs:
     verse-core (2.0.0)
@@ -10,7 +10,7 @@ GIT
 
 GIT
   remote: https://github.com/verse-rb/verse-schema.git
-  revision: 93677df7d86c209f60f280a4db51dfa1a9ea9e36
+  revision: da717d8b2155cf477a3ded8932735362b4987658
   branch: master
   specs:
     verse-schema (0.1.0)

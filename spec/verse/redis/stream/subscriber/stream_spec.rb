@@ -40,9 +40,10 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       manager: nil,
       consumer_name: "test_group",
       consumer_id: "test_id",
+      prefix: "VERSE:STREAM:",
       redis: redis_listener
-    ) do |channel, message|
-      (@messages[channel] ||= []) << message
+    ) do |_channel, message|
+      (@messages[message.channel] ||= []) << message
       queue << message
     end
   end
@@ -121,7 +122,8 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       redis.xadd("VERSE:STREAM:test_channel$1", { msg: msg.pack })
 
       queue.pop
-      expect(@messages["VERSE:STREAM:test_channel$1"].map(&:content)).to eq([{ a: 1 }])
+      # The message should be in the business channel "test_channel" now, not the full Redis channel
+      expect(@messages["test_channel"].map(&:content)).to eq([{ a: 1 }])
     end
   end
 end
