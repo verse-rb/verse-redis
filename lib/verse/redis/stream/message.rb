@@ -9,7 +9,7 @@ module Verse
       # A naive implementation of a message for Redis Streams
       # using msgpack and zlib to compress the message.
       class Message < Verse::Event::Message
-        attr_reader :id, :channel, :consumer_group, :redis_channel
+        attr_reader :id, :consumer_group, :redis_channel
 
         def initialize(
           content,
@@ -21,11 +21,9 @@ module Verse
           consumer_group: nil
         )
           @id = id || SecureRandom.random_number(2 << 48).to_s(36)
-
-          @channel = channel
           @consumer_group = consumer_group
 
-          super(content, manager:, headers:, reply_to:)
+          super(content, manager:, headers:, reply_to:, channel:)
         end
         # rubocop:enable Metrics/ParameterLists
 
