@@ -18,12 +18,13 @@ module Verse
           reply_to: nil,
           id: nil,
           channel: nil,
+          event: nil,
           consumer_group: nil
         )
           @id = id || SecureRandom.random_number(2 << 48).to_s(36)
           @consumer_group = consumer_group
 
-          super(content, manager:, headers:, reply_to:, channel:)
+          super(content, manager:, headers:, reply_to:, channel:, event:)
         end
         # rubocop:enable Metrics/ParameterLists
 
@@ -44,6 +45,21 @@ module Verse
             symbolize_keys: true
           )
 
+          # Note: In case the message has a even header, we will attach it
+          # to the channel name to describe the event name.
+          # This is due to the fact that the messages coming from streams
+          # uses unqualified (no event) channel names, for ensuring that
+          # the evens are processed in the correct order.
+          #
+          # To be honest, I'm not very happy with this solution, and would
+          # like to find a better way to handle this.
+          event = \
+            if hash[:h] && evt_name = hash[:h][:event]
+              [channel, evt_name].join(":")
+            else
+              channel
+            end
+
           new(
             hash[:c],
             headers: hash[:h],
@@ -51,6 +67,7 @@ module Verse
             id: hash[:i],
             manager:,
             channel:,
+            event:,
             consumer_group:
           )
         end
