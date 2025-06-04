@@ -23,7 +23,9 @@ module Verse
         @at = next_trigger.to_f
 
         after do
-          @at = @cron_rule.next(@at + 0.01).first.to_f
+          @at = @cron_rule.next(
+            Time.at(@at + 0.01)
+          ).first.to_f
           manager.add_task(self)
         end
 

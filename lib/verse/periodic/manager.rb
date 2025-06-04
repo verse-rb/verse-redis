@@ -36,7 +36,7 @@ module Verse
 
             if next_task.nil?
               @cond.wait
-            elsif next_task.at < now
+            elsif next_task.at <= now
               @task_list.shift
               @executioner.call(next_task)
             else

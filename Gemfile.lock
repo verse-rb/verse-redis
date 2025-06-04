@@ -1,12 +1,12 @@
 GIT
   remote: https://github.com/verse-rb/verse-core.git
-  revision: 60ef47663582506a87cf74a42b3ecd262490afc2
+  revision: aa8368d678d5e0faf8a054f9f1699e7a99707a75
   branch: master
   specs:
     verse-core (2.0.0)
       i18n (~> 1.10.0)
       thor (~> 1.2.1)
-      verse-schema (~> 1.0.0)
+      verse-schema (>= 1)
 
 PATH
   remote: .
