@@ -28,7 +28,7 @@ module Verse
       end
 
       def acquire(lock_key, requested_ttl_ms, acquire_timeout_ms)
-        token = SecureRandom.hex(16)
+        token = SecureRandom.hex(32)
         deadline = Time.now + (acquire_timeout_ms / 1000.0)
         lock_key = prefixed_key(lock_key)
 
