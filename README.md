@@ -63,9 +63,9 @@ To use the Redis-backed event manager, configure it in your `config.ru` or an in
 # config/development.yml
 
 em:
-  adapter: Verse::Redis::Stream::EventManager
+  adapter: :redis
   config:
-    redis_plugin: :redis # optional, default to :redis
+    plugin: :redis # optional, default to :redis
     # other event manager options
 ```
 
