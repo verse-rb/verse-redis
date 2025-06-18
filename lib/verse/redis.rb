@@ -6,6 +6,7 @@ require_relative "redis/plugin"
 require_relative "redis/stream/event_manager"
 require_relative "redis/kv_store"
 require_relative "redis/lock"
+require_relative "redis/counter"
 
 require_relative "./ext"
 
