@@ -178,7 +178,7 @@ module Verse
             hash = {}
 
             message_channels.each do |channel|
-              original_channel, shard_id = channel.split(/:(?!.*:)/)
+              original_channel, _, shard_id = channel.rpartition("$")
               shard_id = shard_id.to_i
 
               hash[original_channel] ||= 0xffffffff
@@ -261,13 +261,10 @@ module Verse
             channel, messages = channel_messages
 
             business_channel = channel
-
-            if @prefix
-              business_channel = channel.sub(@prefix, "")
-            end
+            business_channel = business_channel.sub(@prefix, "") if @prefix
 
             # Remove the shard id from the channel name
-            business_channel = business_channel.split(/\$([^$]+)$/).first
+            business_channel, = business_channel.rpartition("$")
 
             messages.each do |(_, message)|
               message = Message.unpack(
