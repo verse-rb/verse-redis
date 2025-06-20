@@ -63,10 +63,24 @@ To use the Redis-backed event manager, configure it in your `config.ru` or an in
 # config/development.yml
 
 em:
-  adapter: :redis
+  adapter: redis
   config:
-    plugin: :redis # optional, default to :redis
+    plugin: redis # optional, default to :redis
     # other event manager options
+```
+
+### Cache
+
+To use the Redis-backed Cache, configure it in your `config.ru` or an initializer:
+
+```yaml
+# config/development.yml
+
+cache:
+  adapter: Verse::Redis::CacheAdapter
+  config:
+    plugin: redis # optional, default to :redis
+    key_prefix: "my_app:cache" # optional
 ```
 
 ### Distributed Utilities
@@ -83,8 +97,8 @@ To use the Redis-backed KVStore, configure it in your `config.ru` or an initiali
 kv_store:
   adapter: Verse::Redis::KVStore
   config:
-    plugin: :redis # optional, default to :redis
-    key_prefix: "my_app" # optional
+    plugin: redis # optional, default to :redis
+    key_prefix: "my_app:keys" # optional
 ```
 
 #### Lock
@@ -97,7 +111,7 @@ To use the Redis-backed Lock, configure it in your `config.ru` or an initializer
 lock:
   adapter: Verse::Redis::Lock
   config:
-    plugin: :redis # optional, default to :redis
+    plugin: redis # optional, default to :redis
     key_prefix: "my_app:locks" # optional
 ```
 
@@ -111,7 +125,7 @@ To use the Redis-backed Counter, configure it in your `config.ru` or an initiali
 counter:
   adapter: Verse::Redis::Counter
   config:
-    plugin: :redis # optional, default to :redis
+    plugin: redis # optional, default to :redis
     key_prefix: "my_app:counters" # optional
 ```
 
