@@ -126,4 +126,27 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       expect(@messages["test_channel"].map(&:content)).to eq([{ a: 1 }])
     end
   end
+
+  context "#process_messages_from_channel" do
+    it "correctly extracts the business channel from a sharded channel name" do
+      channel = "VERSE:STREAM:test_channel$1"
+      messages = [
+        ["1625071342000-0", { "msg" => "message1" }]
+      ]
+      channel_messages = [channel, messages]
+
+      unpacked_message = Verse::Redis::Stream::Message.new({ a: 1 }, channel: "test_channel")
+
+      expect(Verse::Redis::Stream::Message).to receive(:unpack).with(
+        subject,
+        "message1",
+        channel: "test_channel",
+        consumer_group: "test_group"
+      ).and_return(unpacked_message)
+
+      expect(subject).to receive(:process_message).with(channel, unpacked_message)
+
+      subject.send(:process_messages_from_channel, channel_messages)
+    end
+  end
 end

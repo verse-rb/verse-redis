@@ -3,9 +3,11 @@
 require_relative "redis/version"
 require_relative "redis/plugin"
 
-require_relative "periodic/plugin"
-
 require_relative "redis/stream/event_manager"
+require_relative "redis/kv_store"
+require_relative "redis/lock"
+require_relative "redis/counter"
+require_relative "redis/cache_adapter"
 
 require_relative "./ext"
 
