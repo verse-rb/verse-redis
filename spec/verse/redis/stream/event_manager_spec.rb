@@ -229,6 +229,70 @@ RSpec.describe Verse::Redis::Stream::EventManager do
       end
     end
 
+    it "can still receive events after stop and start (consumer mode)" do
+      total_events = 0
+
+      Verse.on_boot do
+        # Creating the real event manager
+        Verse.event_manager.subscribe(
+          topic: "example:topic",
+          mode: Verse::Event::Manager::MODE_CONSUMER
+        ) do |message, _channel|
+
+          @queue.push(message)
+          total_events += 1
+        end
+      end
+
+      Verse.start(
+        :test,
+        config_path: "./spec/spec_data/config.yml"
+      )
+
+      5.times do
+        Verse.publish(
+          "example:topic",
+          "This is a payload",
+          headers: { header1: "value1" }
+        )
+      end
+
+      5.times do
+        queue.pop
+      end
+
+      expect(total_events).to eq(5)
+
+      # Fork to a new process to simulate a puma worker
+      child = fork do
+        # Restart the event manager on forking:
+        Verse.event_manager.restart
+
+        5.times do
+          Verse.publish(
+            "example:topic",
+            "This is a payload",
+            headers: { header1: "value1" }
+          )
+        end
+
+        exit! # exit the forked process without calling at_exit hooks
+      end
+
+      sleep 0.5 # Give some time for the child process to start
+      5.times do
+        Verse.publish(
+          "example:topic",
+          "This is a payload",
+          headers: { header1: "value1" }
+        )
+      end
+
+      Timeout.timeout(5) do
+        Process.wait(child)
+      end
+    end
+
     it "can publish and receive resource event (mode CONSUMER)" do
       total_events = 0
       received_channels = []

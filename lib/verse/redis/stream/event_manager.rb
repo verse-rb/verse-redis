@@ -187,7 +187,7 @@ module Verse
 
             cond.wait # ensure that the subscription process done before sending the message
             with_redis{ |rd|
-              logger.debug { "publishing on `#{channel}` (#{msgpacked.size} bytes)" }
+              logger.debug { "Publishing on `#{channel}` (#{msgpacked.size} bytes)" }
               rd.publish(channel, msgpacked)
             }
           end
@@ -236,7 +236,7 @@ module Verse
             cond.wait # ensure that the subscription process done before sending the message
 
             with_redis{ |rd|
-              logger.debug { "publishing on `#{channel}` (#{msgpacked.size} bytes)" }
+              logger.debug { "Publishing on `#{channel}` (#{msgpacked.size} bytes)" }
               rd.publish(channel, msgpacked)
             }
           end
@@ -266,7 +266,7 @@ module Verse
         end
 
         def subscribe_resource_event(resource_type:, event:, mode: Verse::Event::Manager::MODE_CONSUMER, &block)
-          logger.debug { "subscribe resource event #{resource_type}##{event} in mode #{mode}" }
+          logger.debug { "Subscribe resource event #{resource_type}##{event} in mode #{mode}" }
 
           stream_id = \
             case mode
@@ -276,7 +276,7 @@ module Verse
               ["VERSE:RESOURCE", resource_type, event].join(":")
             end
 
-          logger.debug { "subscribe on #{stream_id}" }
+          logger.debug { "Subscribe on #{stream_id}" }
 
           callback = lambda do |message, channel|
             next if message.headers[:event] != event
@@ -292,7 +292,7 @@ module Verse
         end
 
         def dispatch_message(channel, message)
-          logger.debug { "dispatch message #{channel} #{message}" }
+          logger.debug { "Dispatch message #{channel} #{message}" }
 
           filter = lambda { |sub|
             sub.mode == Event::Manager::MODE_CONSUMER &&
