@@ -69,6 +69,11 @@ module Verse
           @stopped = true
         end
 
+        def restart
+          stop
+          start
+        end
+
         def with_redis(&block)
           Verse::Plugin[@config.plugin_name].with_client(&block)
         end
