@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "./base"
+require "monitor"
 
 module Verse
   module Redis
@@ -36,6 +37,8 @@ module Verse
           # atomic unlock of shards
           UNLOCK_SHARDS_SCRIPT = File.read(File.join(__dir__, "unlock_shards.lua").freeze)
 
+          include MonitorMixin
+
           # Initialize a new subscriber in charge of
           # reading messages from multiple redis streams.
           #
@@ -59,6 +62,8 @@ module Verse
 
             @sha_scripts = {}.compare_by_identity
             @shards = shards
+
+            @cond = new_cond
 
             @config = validate_config(config)
             @block_time = @config.min_block_time
@@ -86,6 +91,7 @@ module Verse
 
           def stop
             super
+            synchronize{ @cond.signal }
             @stream_thread&.join
           end
 
@@ -220,13 +226,22 @@ module Verse
           end
 
           def read_stream(redis, channels)
+            # We call xreadgroup with block time in milliseconds
+            # to avoid blocking the thread for too long.
+            # The idea is to get message as quickly as possible,
+            # but not to block the thread for too long if
+            # there are no messages as the blocking is non-interruptible.
+            # When closing the service, we want to be able to
+            # finalize quickly.
+            min_block = [1, @config.min_block_time * 1000].max.to_i
+
             redis.xreadgroup(
               @consumer_name,
               @consumer_id,
               channels,
               [">"] * channels.size,
               count: @config.max_messages_count,
-              block: @block_time * 1_000, # Time to wait for messages
+              block: min_block,
               noack: true # simpler, no pending list, can cause loss of messages sometime.
             )
           rescue ::Redis::TimeoutError
@@ -238,23 +253,25 @@ module Verse
           end
 
           def read_channels(redis, channels)
-            if channels.empty?
-              # do not increase the block time if we have nothing to do
-              # here since the probable cause is that another service
-              # has already locked onto the streams.
-              sleep @block_time
-              return []
+            synchronize do
+              if channels.empty?
+                # do not increase the block time if we have nothing to do
+                # here since the probable cause is that another service
+                # has already locked onto the streams.
+                @cond.wait(@block_time)
+                return []
+              end
+
+              output = read_stream(redis, channels)
+
+              if output.any?
+                reduce_block_time
+              else
+                increase_block_time
+              end
+
+              output
             end
-
-            output = read_stream(redis, channels)
-
-            if output.any?
-              reduce_block_time
-            else
-              increase_block_time
-            end
-
-            output
           end
 
           def process_messages_from_channel(channel_messages)
@@ -301,6 +318,9 @@ module Verse
                   # process the messages
                   output.each(&method(:process_messages_from_channel))
                 end
+
+                # Wait for the next iteration
+                synchronize { @cond.wait(@block_time) }
               rescue StandardError => e
                 # log the error but continue the loop
                 Verse.logger.error { e }

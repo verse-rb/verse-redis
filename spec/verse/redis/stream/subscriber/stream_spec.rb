@@ -125,6 +125,45 @@ RSpec.describe Verse::Redis::Stream::Subscriber::Stream do
       # The message should be in the business channel "test_channel" now, not the full Redis channel
       expect(@messages["test_channel"].map(&:content)).to eq([{ a: 1 }])
     end
+
+    it "stress test" do
+      subs = 10.times.map do |i|
+        described_class.new(
+          config,
+          manager: nil,
+          consumer_name: "test_group",
+          consumer_id: "consumer_#{i}",
+          prefix: "VERSE:STREAM:",
+          redis: Redis.new
+        ) do |channel, message|
+          (@messages[channel] ||= []) << message
+          queue << message
+        end
+      end
+
+      subs.each do |s|
+        s.subscribe("VERSE:STREAM:stress_test")
+        s.start
+      end
+
+      sleep(0.1) # Wait for subscriptions to start
+
+      random_set = [*("A".."Z").to_a, " ", *("0".."9").to_a]
+
+      10.times do
+        16.times do |shard|
+          content = 2048.times.map { random_set.sample }.join
+          msg = Verse::Redis::Stream::Message.new(content)
+          redis.xadd("VERSE:STREAM:stress_test$#{shard}", { msg: msg.pack })
+        end
+      end
+
+      160.times { queue.pop }
+
+      16.times do |shard|
+        expect(@messages["VERSE:STREAM:stress_test$#{shard}"].size).to eq(10)
+      end
+    end
   end
 
   context "#process_messages_from_channel" do
