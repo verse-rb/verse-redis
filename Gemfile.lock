@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/verse-rb/verse-core.git
-  revision: e741875ac44dfd201b5586ac359993c2fb9d649c
+  revision: f76dd9f6b74fc4be92d74c2de01c34d40f72bdbe
   branch: master
   specs:
     verse-core (2.0.0)
@@ -33,14 +33,14 @@ GEM
     fugit (1.11.1)
       et-orbi (~> 1, >= 1.2.11)
       raabro (~> 1.4)
-    json (2.13.0)
+    json (2.13.1)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
     method_source (1.1.0)
     msgpack (1.8.0)
     parallel (1.27.0)
-    parser (3.3.8.0)
+    parser (3.3.9.0)
       ast (~> 2.4.1)
       racc
     prism (1.4.0)
