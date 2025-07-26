@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "./base"
-require "monitor"
 
 module Verse
   module Redis
@@ -37,8 +36,6 @@ module Verse
           # atomic unlock of shards
           UNLOCK_SHARDS_SCRIPT = File.read(File.join(__dir__, "unlock_shards.lua").freeze)
 
-          include MonitorMixin
-
           # Initialize a new subscriber in charge of
           # reading messages from multiple redis streams.
           #
@@ -63,7 +60,10 @@ module Verse
             @sha_scripts = {}.compare_by_identity
             @shards = shards
 
-            @cond = new_cond
+            @mutex = Mutex.new
+            @cond = ConditionVariable.new
+            @mutex_liveness = Mutex.new
+            @cond_liveness = ConditionVariable.new
 
             @config = validate_config(config)
             @block_time = @config.min_block_time
@@ -91,25 +91,32 @@ module Verse
 
           def stop
             super
-            synchronize{ @cond.signal }
+            @mutex.synchronize{ @cond.signal }
+            @mutex_liveness.synchronize{ @cond_liveness.signal }
             @stream_thread&.join
           end
 
           protected
 
           def liveness_run
-            key = "{VERSE:STREAM:SHARDLOCK}:SERVICE_LIVENESS:#{@consumer_id}"
+            @mutex_liveness.synchronize do
+              key = "{VERSE:STREAM:SHARDLOCK}:SERVICE_LIVENESS:#{@consumer_id}"
 
-            until @stopped
-              redis do |r|
-                r.set(key, 1, ex: 30)
+              until @stopped
+                redis do |r|
+                  r.set(key, 1, ex: 30)
+                end
+
+                @cond_liveness.wait(@mutex_liveness, 15)
               end
-
-              sleep 15
             end
           rescue StandardError => e
             # Redis error? Log it and continue
             Verse.logger.error(e)
+            Verse.logger.error("Retrying to set liveness key in 3 seconds...")
+
+            @mutex_liveness.synchronize{ @cond_liveness.wait(@mutex_liveness, 3) }
+
             retry
           end
 
@@ -253,12 +260,12 @@ module Verse
           end
 
           def read_channels(redis, channels)
-            synchronize do
+            @mutex.synchronize do
               if channels.empty?
                 # do not increase the block time if we have nothing to do
                 # here since the probable cause is that another service
                 # has already locked onto the streams.
-                @cond.wait(@block_time)
+                @cond.wait(@mutex, @block_time)
                 return []
               end
 
@@ -320,7 +327,7 @@ module Verse
                 end
 
                 # Wait for the next iteration
-                synchronize { @cond.wait(@block_time) }
+                @mutex.synchronize { @cond.wait(@mutex, @block_time) }
               rescue StandardError => e
                 # log the error but continue the loop
                 Verse.logger.error { e }
